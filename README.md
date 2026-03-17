@@ -21,3 +21,6 @@
 * 后端：Node.js / Express
 * 数据库：MySQL
 * AI模型：TensorFlow / PyTorch（用于鸟类图像识别）
+
+## Figma链接
+- https://www.figma.com/design/Uv5JLhnpF13kKVHNhKPQRM/AviAI-UI?node-id=0-1&t=yDerZ4QUSjfFUZdV-1
