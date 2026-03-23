@@ -1,0 +1,15 @@
+<view class="container">
+  <view class="card">
+    <view class="title">AviAI 小程序骨架</view>
+    <view class="desc">点击按钮请求后端健康检查接口</view>
+
+    <button class="btn" bindtap="onCheckHealth" loading="{{loading}}" disabled="{{loading}}">
+      {{loading ? '请求中...' : '检查后端状态'}}
+    </button>
+
+    <view class="result-title">接口返回：</view>
+    <scroll-view class="result-box" scroll-y="true">
+      <text class="result-text">{{resultText}}</text>
+    </scroll-view>
+  </view>
+</view>
