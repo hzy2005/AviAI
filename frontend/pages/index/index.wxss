@@ -1,0 +1,54 @@
+.container {
+  min-height: 100vh;
+  padding: 32rpx;
+  box-sizing: border-box;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  box-shadow: 0 10rpx 40rpx rgba(18, 38, 63, 0.08);
+}
+
+.title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.desc {
+  margin-top: 12rpx;
+  color: #6b7280;
+  font-size: 28rpx;
+}
+
+.btn {
+  margin-top: 24rpx;
+  background: #1d9c5a;
+  color: #ffffff;
+  border: 0;
+}
+
+.result-title {
+  margin-top: 24rpx;
+  font-size: 28rpx;
+  color: #374151;
+}
+
+.result-box {
+  margin-top: 12rpx;
+  max-height: 520rpx;
+  background: #0f172a;
+  border-radius: 12rpx;
+  padding: 16rpx;
+  box-sizing: border-box;
+}
+
+.result-text {
+  font-family: Consolas, "Courier New", monospace;
+  color: #e2e8f0;
+  font-size: 24rpx;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
