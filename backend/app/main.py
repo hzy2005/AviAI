@@ -2,6 +2,10 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.db.session import engine
 
 
 app = FastAPI(title="AviAI Backend", version="0.1.0")
@@ -17,12 +21,21 @@ app.add_middleware(
 
 @app.get("/api/v1/health")
 def health_check():
+    db_status = "disconnected"
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        db_status = "connected"
+    except SQLAlchemyError:
+        db_status = "disconnected"
+
     return {
         "code": 0,
         "message": "ok",
         "data": {
             "service": "backend",
             "status": "running",
+            "database": db_status,
             "time": datetime.now(timezone.utc).isoformat(),
         },
     }
