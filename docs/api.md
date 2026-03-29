@@ -1,13 +1,19 @@
-﻿# AviAI API 文档（api.md）
+# AviAI API 文档（api.md）
 
-## 1. 说明
+## 1. 文档说明
+
+本项目 API 按 OpenAPI 3.0 规范维护，完整机器可读文档见 [api.yaml](./api.yaml)。  
+本文档用于快速阅读和联调，字段与状态码以 `api.yaml` 为准。
+
 - 基础路径：`/api/v1`
 - 数据格式：`application/json`
-- 鉴权方式：`Authorization: Bearer <token>`
-- 时间格式：ISO 8601（示例：`2026-03-09T10:30:00Z`）
+- 认证方式：`Authorization: Bearer <token>`
+- 时间格式：ISO 8601（例如 `2026-03-09T10:30:00Z`）
 
-## 2. 通用响应结构
-### 2.1 成功响应
+## 2. 响应约定
+
+所有接口统一返回：
+
 ```json
 {
   "code": 0,
@@ -16,7 +22,8 @@
 }
 ```
 
-### 2.2 失败响应
+错误响应示例：
+
 ```json
 {
   "code": 1001,
@@ -25,47 +32,37 @@
 }
 ```
 
-### 2.3 常见错误码
-- 0: 成功
-- 1001: 参数错误
-- 1002: 未登录或 Token 无效
-- 1003: 无权限
-- 1004: 资源不存在
-- 1005: 服务内部错误
-- 1006: 上传文件不合法
+常见错误码：
 
-## 3. 认证模块
-### 3.1 用户注册
-- 方法：`POST`
-- 路径：`/auth/register`
-- 鉴权：否
+- `0`：成功
+- `1001`：参数错误
+- `1002`：未登录或 Token 无效
+- `1003`：无权限
+- `1004`：资源不存在
+- `1005`：服务内部错误
+- `1006`：上传文件不合法
 
-请求体：
-```json
-{
-  "username": "birdlover",
-  "email": "bird@example.com",
-  "password": "12345678"
-}
-```
+## 3. 接口总览
 
-响应示例：
-```json
-{
-  "code": 0,
-  "message": "ok",
-  "data": {
-    "userId": 1
-  }
-}
-```
+| 模块 | 方法 | 路径 | 鉴权 | 说明 |
+| --- | --- | --- | --- | --- |
+| Health | GET | `/health` | 否 | 服务健康检查 |
+| Auth | POST | `/auth/register` | 否 | 用户注册 |
+| Auth | POST | `/auth/login` | 否 | 用户登录 |
+| Users | GET | `/users/me` | 是 | 获取当前用户信息 |
+| Birds | POST | `/birds/recognize` | 是 | 上传图片并识别 |
+| Birds | GET | `/birds/records` | 是 | 查询识别历史 |
+| Posts | POST | `/posts` | 是 | 发布动态 |
+| Posts | GET | `/posts` | 否 | 动态列表 |
+| Posts | POST | `/posts/{postId}/like` | 是 | 点赞动态 |
+| Posts | POST | `/posts/{postId}/comments` | 是 | 评论动态 |
 
-### 3.2 用户登录
-- 方法：`POST`
-- 路径：`/auth/login`
-- 鉴权：否
+## 4. 关键请求示例
 
-请求体：
+### 4.1 登录
+
+`POST /api/v1/auth/login`
+
 ```json
 {
   "email": "bird@example.com",
@@ -73,103 +70,15 @@
 }
 ```
 
-响应示例：
-```json
-{
-  "code": 0,
-  "message": "ok",
-  "data": {
-    "token": "jwt-token",
-    "user": {
-      "id": 1,
-      "username": "birdlover",
-      "avatarUrl": ""
-    }
-  }
-}
-```
+### 4.2 识别图片
 
-## 4. 用户模块
-### 4.1 获取当前用户信息
-- 方法：`GET`
-- 路径：`/users/me`
-- 鉴权：是
+`POST /api/v1/birds/recognize`  
+`Content-Type: multipart/form-data`，字段名：`image`
 
-响应示例：
-```json
-{
-  "code": 0,
-  "message": "ok",
-  "data": {
-    "id": 1,
-    "username": "birdlover",
-    "email": "bird@example.com",
-    "avatarUrl": "",
-    "createdAt": "2026-03-09T10:30:00Z"
-  }
-}
-```
+### 4.3 发布动态
 
-## 5. 鸟类识别模块
-### 5.1 上传图片并识别
-- 方法：`POST`
-- 路径：`/birds/recognize`
-- 鉴权：是
-- Content-Type：`multipart/form-data`
-- 表单字段：`image`（jpg/png，建议 <= 5MB）
+`POST /api/v1/posts`
 
-响应示例：
-```json
-{
-  "code": 0,
-  "message": "ok",
-  "data": {
-    "recordId": 101,
-    "birdName": "白鹭",
-    "confidence": 0.9342,
-    "imageUrl": "/uploads/20260309_xxx.jpg",
-    "createdAt": "2026-03-09T10:35:00Z"
-  }
-}
-```
-
-### 5.2 查询识别历史
-- 方法：`GET`
-- 路径：`/birds/records`
-- 鉴权：是
-- 查询参数：
-  - `page`：页码，默认 1
-  - `pageSize`：每页数量，默认 10
-
-响应示例：
-```json
-{
-  "code": 0,
-  "message": "ok",
-  "data": {
-    "list": [
-      {
-        "recordId": 101,
-        "birdName": "白鹭",
-        "confidence": 0.9342,
-        "imageUrl": "/uploads/20260309_xxx.jpg",
-        "createdAt": "2026-03-09T10:35:00Z"
-      }
-    ],
-    "total": 1,
-    "page": 1,
-    "pageSize": 10
-  }
-}
-```
-
-## 6. 社区模块
-### 6.1 发布动态
-- 方法：`POST`
-- 路径：`/posts`
-- 鉴权：是
-
-请求体：
 ```json
 {
   "content": "今天在湿地拍到了白鹭！",
@@ -177,34 +86,13 @@
 }
 ```
 
-### 6.2 动态列表
-- 方法：`GET`
-- 路径：`/posts`
-- 鉴权：否
-- 查询参数：`page`、`pageSize`
+## 5. OpenAPI 使用方式
 
-### 6.3 点赞动态
-- 方法：`POST`
-- 路径：`/posts/{postId}/like`
-- 鉴权：是
+1. 导入 `docs/api.yaml` 到 Swagger Editor（https://editor.swagger.io）可直接查看接口结构。  
+2. 如需本地展示，可在后端接入 Swagger UI 并加载此 yaml。  
+3. 每次接口变更先更新 `api.yaml`，再同步更新本文件总览和示例。
 
-### 6.4 评论动态
-- 方法：`POST`
-- 路径：`/posts/{postId}/comments`
-- 鉴权：是
+## 6. 版本记录
 
-请求体：
-```json
-{
-  "content": "拍得很清晰！"
-}
-```
-
-## 7. 接口实现约定
-- 所有分页接口返回 `list + total + page + pageSize`。
-- 所有创建接口优先返回创建后的 `id`。
-- 后端出现异常时，返回统一错误结构，不直接暴露堆栈。
-- API 变更需同步更新本文件并标注版本号。
-
-## 8. 版本记录
-- v0.1（2026-03-09）：初版接口定义，覆盖认证、识别、社区三大核心能力。
+- `v0.2.0`（2026-03-25）：补全 OpenAPI 3.0 规范，新增 `api.yaml`，统一组件定义与接口清单。  
+- `v0.1.0`（2026-03-09）：初版接口定义，覆盖认证、识别、社区三大核心能力。  
