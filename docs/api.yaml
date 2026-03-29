@@ -426,7 +426,9 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: 使用 `Authorization: Bearer <token>` 传递登录令牌。
+      description: |
+        JWT 身份验证
+        使用格式：Authorization: Bearer <token>
 
   parameters:
     PageParam:
