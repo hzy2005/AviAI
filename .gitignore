@@ -30,6 +30,10 @@ pnpm-debug.log*
 *.tmp
 *.temp
 .cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyc.*
 
 # Uploads and local generated assets
 uploads/
@@ -50,6 +54,7 @@ desktop.ini
 
 # Test artifacts
 .nyc_output/
+.pytest_cache/
 
 # Package manager stores
 .pnpm-store/

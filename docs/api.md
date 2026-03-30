@@ -49,11 +49,15 @@
 | Health | GET | `/health` | 否 | 服务健康检查 |
 | Auth | POST | `/auth/register` | 否 | 用户注册 |
 | Auth | POST | `/auth/login` | 否 | 用户登录 |
+| Auth | POST | `/auth/logout` | 否 | 用户登出 |
 | Users | GET | `/users/me` | 是 | 获取当前用户信息 |
 | Birds | POST | `/birds/recognize` | 是 | 上传图片并识别 |
 | Birds | GET | `/birds/records` | 是 | 查询识别历史 |
 | Posts | POST | `/posts` | 是 | 发布动态 |
-| Posts | GET | `/posts` | 否 | 动态列表 |
+| Posts | GET | `/posts` | 否 | 动态列表，支持分页与关键词筛选 |
+| Posts | GET | `/posts/{postId}` | 否 | 获取动态详情 |
+| Posts | PUT | `/posts/{postId}` | 是 | 更新动态 |
+| Posts | DELETE | `/posts/{postId}` | 是 | 删除动态 |
 | Posts | POST | `/posts/{postId}/like` | 是 | 点赞动态 |
 | Posts | POST | `/posts/{postId}/comments` | 是 | 评论动态 |
 
@@ -86,13 +90,38 @@
 }
 ```
 
+### 4.4 更新动态
+
+`PUT /api/v1/posts/{postId}`
+
+```json
+{
+  "content": "更新后的观鸟记录",
+  "imageUrl": "/uploads/post_001_updated.jpg"
+}
+```
+
+### 4.5 列表筛选
+
+`GET /api/v1/posts?page=1&pageSize=10&keyword=白鹭`
+
 ## 5. OpenAPI 使用方式
 
 1. 导入 `docs/api.yaml` 到 Swagger Editor（https://editor.swagger.io）可直接查看接口结构。  
 2. 如需本地展示，可在后端接入 Swagger UI 并加载此 yaml。  
 3. 每次接口变更先更新 `api.yaml`，再同步更新本文件总览和示例。
 
-## 6. 版本记录
+## 6. 作业对照
 
+- 已完成 OpenAPI 文档：`docs/api.yaml`
+- 已完成 API 使用说明：`docs/api.md`
+- 已补充前端 API 访问层：`frontend/src/api/`
+- 已补充后端路由实现：`backend/app/routes/`
+- 已补充 Mock 数据：`frontend/src/mocks/handlers.js`、`db.json`
+- 已补充后端测试：`backend/tests/test_api.py`
+
+## 7. 版本记录
+
+- `v0.3.0`（2026-03-30）：补充登出接口、帖子 CRUD、查询筛选、前端 API 访问层与 Mock 配置。  
 - `v0.2.0`（2026-03-25）：补全 OpenAPI 3.0 规范，新增 `api.yaml`，统一组件定义与接口清单。  
 - `v0.1.0`（2026-03-09）：初版接口定义，覆盖认证、识别、社区三大核心能力。  

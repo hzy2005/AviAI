@@ -1,0 +1,24 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "birdlover",
+      "email": "bird@example.com"
+    }
+  ],
+  "posts": [
+    {
+      "id": 1001,
+      "content": "今天在湿地拍到了白鹭！",
+      "imageUrl": "/uploads/post_001.jpg"
+    }
+  ],
+  "birdRecords": [
+    {
+      "id": 101,
+      "birdName": "白鹭",
+      "confidence": 0.9342,
+      "imageUrl": "/uploads/20260309_egret.jpg"
+    }
+  ]
+}
