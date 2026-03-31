@@ -133,6 +133,28 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: 用户登出
+      description: 清理当前登录状态。
+      operationId: logoutUser
+      x-idempotent: true
+      responses:
+        "200":
+          description: 登出成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogoutResponse"
+              examples:
+                success:
+                  value:
+                    code: 0
+                    message: ok
+                    data:
+                      success: true
+
   /users/me:
     get:
       tags: [Users]
@@ -298,12 +320,13 @@ paths:
     get:
       tags: [Posts]
       summary: 获取动态列表
-      description: 分页获取社区动态列表（公开接口）。
+      description: 分页获取社区动态列表（公开接口），支持关键词筛选。
       operationId: listPosts
       x-idempotent: true
       parameters:
         - $ref: "#/components/parameters/PageParam"
         - $ref: "#/components/parameters/PageSizeParam"
+        - $ref: "#/components/parameters/KeywordParam"
       responses:
         "200":
           description: 查询成功
@@ -335,6 +358,73 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "500":
           $ref: "#/components/responses/InternalError"
+
+  /posts/{postId}:
+    get:
+      tags: [Posts]
+      summary: 获取动态详情
+      description: 根据动态 ID 获取单条动态详情。
+      operationId: getPostDetail
+      x-idempotent: true
+      parameters:
+        - $ref: "#/components/parameters/PostIdParam"
+      responses:
+        "200":
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Posts]
+      summary: 更新动态
+      description: 更新当前用户自己发布的动态。
+      operationId: updatePost
+      x-idempotent: false
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatePostResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Posts]
+      summary: 删除动态
+      description: 删除当前用户自己发布的动态。
+      operationId: deletePost
+      x-idempotent: true
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostIdParam"
+      responses:
+        "200":
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletePostResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /posts/{postId}/like:
     post:
@@ -426,7 +516,9 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: 使用 `Authorization: Bearer <token>` 传递登录令牌。
+      description: |
+        JWT 身份验证
+        使用格式：Authorization: Bearer <token>
 
   parameters:
     PageParam:
@@ -450,6 +542,15 @@ components:
         maximum: 100
         default: 10
       example: 10
+    KeywordParam:
+      name: keyword
+      in: query
+      description: 按动态内容关键词筛选。
+      required: false
+      schema:
+        type: string
+        default: ""
+      example: 白鹭
     PostIdParam:
       name: postId
       in: path
@@ -691,6 +792,27 @@ components:
         data:
           $ref: "#/components/schemas/LoginResponseData"
 
+    LogoutResponseData:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          example: true
+
+    LogoutResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/LogoutResponseData"
+
     UserProfile:
       type: object
       description: 当前用户完整资料。
@@ -929,6 +1051,11 @@ components:
           format: date-time
           description: 发布时间。
           example: "2026-03-09T12:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新时间。
+          example: "2026-03-09T12:30:00Z"
         author:
           $ref: "#/components/schemas/PostAuthor"
 
@@ -966,6 +1093,19 @@ components:
           example: ok
         data:
           $ref: "#/components/schemas/PostPageData"
+
+    PostDetailResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/PostItem"
 
     LikePostResponseData:
       type: object
@@ -1031,3 +1171,27 @@ components:
           example: ok
         data:
           $ref: "#/components/schemas/CreateCommentResponseData"
+
+    DeletePostResponseData:
+      type: object
+      required: [postId, deleted]
+      properties:
+        postId:
+          type: integer
+          example: 1001
+        deleted:
+          type: boolean
+          example: true
+
+    DeletePostResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/DeletePostResponseData"
