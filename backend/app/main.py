@@ -12,7 +12,7 @@ from app.routes.posts import router as posts_router
 from app.routes.users import router as users_router
 
 
-app = FastAPI(title="AviAI Backend", version="0.3.0")
+app = FastAPI(title="AviAI API", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,

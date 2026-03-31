@@ -115,7 +115,6 @@
 
   <view class="panel">
     <view class="panel-title">{{lastResultTitle}}</view>
-    <view class="panel-desc">截图时这一块最有用，能直接展示接口返回结构。</view>
     <view class="console-box result-console">
       <text class="console-text">{{lastResultText}}</text>
     </view>
