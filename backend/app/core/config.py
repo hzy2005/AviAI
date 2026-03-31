@@ -3,6 +3,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "AviAI Backend"
+    secret_key: str = "aviai-dev-secret"
+    access_token_expire_minutes: int = 60 * 24 * 7
+    use_mock_data: bool = True
     database_url: str = (
         "mysql+pymysql://root:123456@127.0.0.1:3306/aviai?charset=utf8mb4"
     )

@@ -1,14 +1,18 @@
 from datetime import datetime, timezone
-
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.core.responses import success
 from app.db.session import engine
+from app.routes.auth import router as auth_router
+from app.routes.birds import router as birds_router
+from app.routes.posts import router as posts_router
+from app.routes.users import router as users_router
 
 
-app = FastAPI(title="AviAI Backend", version="0.1.0")
+app = FastAPI(title="AviAI API", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,7 +21,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 @app.get("/api/v1/health")
 def health_check():
@@ -29,42 +32,17 @@ def health_check():
     except SQLAlchemyError:
         db_status = "disconnected"
 
-    return {
-        "code": 0,
-        "message": "ok",
-        "data": {
+    return success(
+        {
             "service": "backend",
             "status": "running",
             "database": db_status,
             "time": datetime.now(timezone.utc).isoformat(),
-        },
-    }
+        }
+    )
 
 
-@app.get("/api/v1/users/me")
-def get_current_user():
-    return {
-        "code": 0,
-        "message": "ok",
-        "data": {
-            "id": 1,
-            "username": "birdlover",
-            "email": "bird@example.com",
-            "avatarUrl": "",
-        },
-    }
-
-
-@app.post("/api/v1/birds/recognize")
-async def recognize_bird(image: UploadFile = File(...)):
-    # Demo response; real model inference can be integrated later.
-    return {
-        "code": 0,
-        "message": "ok",
-        "data": {
-            "recordId": 101,
-            "fileName": image.filename,
-            "birdName": "白鹭",
-            "confidence": 0.93,
-        },
-    }
+app.include_router(auth_router)
+app.include_router(users_router)
+app.include_router(birds_router)
+app.include_router(posts_router)

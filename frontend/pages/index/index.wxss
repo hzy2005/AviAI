@@ -1,54 +1,223 @@
-.container {
+.page {
   min-height: 100vh;
-  padding: 32rpx;
-  box-sizing: border-box;
-}
-
-.card {
-  background: #ffffff;
-  border-radius: 20rpx;
   padding: 28rpx;
-  box-shadow: 0 10rpx 40rpx rgba(18, 38, 63, 0.08);
+  box-sizing: border-box;
+  background:
+    radial-gradient(circle at top left, rgba(61, 168, 105, 0.16), transparent 34%),
+    linear-gradient(180deg, #f4fbf5 0%, #eef5f2 48%, #f7faf8 100%);
 }
 
-.title {
-  font-size: 40rpx;
+.hero {
+  padding: 34rpx 30rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #143f2a 0%, #206849 58%, #3daa69 100%);
+  color: #f8fff9;
+  box-shadow: 0 18rpx 44rpx rgba(20, 63, 42, 0.2);
+}
+
+.hero-badge {
+  display: inline-block;
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 22rpx;
+  letter-spacing: 2rpx;
+}
+
+.hero-title {
+  margin-top: 18rpx;
+  font-size: 46rpx;
   font-weight: 700;
-  color: #111827;
 }
 
-.desc {
-  margin-top: 12rpx;
-  color: #6b7280;
+.hero-desc {
+  margin-top: 14rpx;
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: rgba(248, 255, 249, 0.86);
+}
+
+.status-banner {
+  margin-top: 20rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 24rpx;
+}
+
+.panel {
+  margin-top: 24rpx;
+  padding: 28rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 14rpx 34rpx rgba(31, 52, 44, 0.08);
+}
+
+.panel-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #173426;
+}
+
+.panel-desc {
+  margin-top: 10rpx;
+  font-size: 25rpx;
+  line-height: 1.7;
+  color: #5a6d61;
+}
+
+.field,
+.textarea {
+  width: 100%;
+  margin-top: 18rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 18rpx;
+  box-sizing: border-box;
+  background: #f3f7f4;
+  color: #173426;
   font-size: 28rpx;
 }
 
-.btn {
-  margin-top: 24rpx;
-  background: #1d9c5a;
-  color: #ffffff;
+.textarea {
+  min-height: 180rpx;
+}
+
+.actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 18rpx;
+}
+
+.half-btn {
+  flex: 1;
+}
+
+.primary-btn,
+.secondary-btn,
+.ghost-btn,
+.mini-btn {
+  border-radius: 16rpx;
+  font-size: 26rpx;
   border: 0;
 }
 
-.result-title {
-  margin-top: 24rpx;
-  font-size: 28rpx;
-  color: #374151;
+.primary-btn {
+  margin-top: 18rpx;
+  background: linear-gradient(135deg, #2d8d58 0%, #42b26f 100%);
+  color: #ffffff;
 }
 
-.result-box {
-  margin-top: 12rpx;
-  max-height: 520rpx;
-  background: #0f172a;
-  border-radius: 12rpx;
-  padding: 16rpx;
+.secondary-btn {
+  margin-top: 18rpx;
+  background: #e8f4ec;
+  color: #1c5a3c;
+}
+
+.ghost-btn {
+  margin-top: 18rpx;
+  background: #f3f5f4;
+  color: #42544a;
+}
+
+.mini-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 18rpx;
+}
+
+.mini-btn {
+  min-width: 132rpx;
+  margin: 0;
+  padding: 0 22rpx;
+  background: #eef4f0;
+  color: #214b36;
+}
+
+.danger-btn {
+  background: #fdeceb;
+  color: #a83e35;
+}
+
+.token-tip {
+  margin-top: 16rpx;
+  font-size: 25rpx;
+  color: #506257;
+}
+
+.ok-text {
+  color: #21824f;
+  font-weight: 700;
+}
+
+.warn-text {
+  color: #c15d2d;
+  font-weight: 700;
+}
+
+.info-card,
+.post-card,
+.record-card,
+.empty-card {
+  margin-top: 18rpx;
+  padding: 22rpx;
+  border-radius: 20rpx;
+  background: #f7faf8;
+}
+
+.success-card {
+  background: #edf8f0;
+}
+
+.info-title,
+.record-name,
+.post-author {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #183928;
+}
+
+.info-line,
+.record-line,
+.post-time,
+.post-stats,
+.post-meta {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #617267;
+}
+
+.post-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.post-content {
+  margin-top: 16rpx;
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: #20392b;
+}
+
+.console-box {
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border-radius: 18rpx;
+  background: #10231b;
   box-sizing: border-box;
 }
 
-.result-text {
+.result-console {
+  max-height: 560rpx;
+}
+
+.console-text {
   font-family: Consolas, "Courier New", monospace;
-  color: #e2e8f0;
   font-size: 24rpx;
+  line-height: 1.7;
+  color: #daf5e4;
   white-space: pre-wrap;
   word-break: break-all;
 }

@@ -1,0 +1,1197 @@
+openapi: 3.0.3
+info:
+  title: AviAI API
+  version: 0.3.0
+  description: >
+    AviAI 后端接口文档（OpenAPI 3.0）。基础路径为 /api/v1，
+    统一响应结构为 code/message/data，鉴权方式为 Bearer Token（JWT）。
+servers:
+  - url: http://127.0.0.1:8000/api/v1
+    description: 本地开发环境
+tags:
+  - name: Health
+    description: 服务健康检查
+  - name: Auth
+    description: 认证与登录
+  - name: Users
+    description: 用户信息
+  - name: Birds
+    description: 鸟类识别与记录
+  - name: Posts
+    description: 社区动态互动
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: 健康检查
+      description: 检查服务进程状态及数据库连接状态。
+      operationId: getHealth
+      x-idempotent: true
+      responses:
+        "200":
+          description: 检查成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                success:
+                  summary: 服务正常
+                  value:
+                    code: 0
+                    message: ok
+                    data:
+                      service: backend
+                      status: running
+                      database: connected
+                      time: "2026-03-25T09:30:00Z"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: 用户注册
+      description: 创建新用户账号（用户名和邮箱需唯一）。
+      operationId: registerUser
+      x-idempotent: false
+      requestBody:
+        required: true
+        description: 注册信息
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            examples:
+              default:
+                value:
+                  username: birdlover
+                  email: bird@example.com
+                  password: "12345678"
+      responses:
+        "201":
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+              examples:
+                created:
+                  value:
+                    code: 0
+                    message: ok
+                    data:
+                      userId: 1
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: 用户登录
+      description: 使用邮箱与密码登录，返回 JWT 和基础用户信息。
+      operationId: loginUser
+      x-idempotent: false
+      requestBody:
+        required: true
+        description: 登录信息
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              default:
+                value:
+                  email: bird@example.com
+                  password: "12345678"
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+              examples:
+                success:
+                  value:
+                    code: 0
+                    message: ok
+                    data:
+                      token: jwt-token
+                      user:
+                        id: 1
+                        username: birdlover
+                        avatarUrl: ""
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: 用户登出
+      description: 清理当前登录状态。
+      operationId: logoutUser
+      x-idempotent: true
+      responses:
+        "200":
+          description: 登出成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogoutResponse"
+              examples:
+                success:
+                  value:
+                    code: 0
+                    message: ok
+                    data:
+                      success: true
+
+  /users/me:
+    get:
+      tags: [Users]
+      summary: 获取当前用户
+      description: 获取当前登录用户的完整资料。
+      operationId: getCurrentUser
+      x-idempotent: true
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileResponse"
+              examples:
+                success:
+                  value:
+                    code: 0
+                    message: ok
+                    data:
+                      id: 1
+                      username: birdlover
+                      email: bird@example.com
+                      avatarUrl: ""
+                      createdAt: "2026-03-09T10:30:00Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /birds/recognize:
+    post:
+      tags: [Birds]
+      summary: 上传图片识别
+      description: 上传鸟类图片，触发识别流程并生成一条识别记录。
+      operationId: recognizeBird
+      x-idempotent: false
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        description: 图片文件（jpg/png，建议 <= 5MB）
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: 待识别图片
+      responses:
+        "201":
+          description: 识别成功并创建记录
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecognizeResponse"
+              examples:
+                success:
+                  value:
+                    code: 0
+                    message: ok
+                    data:
+                      recordId: 101
+                      birdName: 白鹭
+                      confidence: 0.9342
+                      imageUrl: /uploads/20260309_xxx.jpg
+                      createdAt: "2026-03-09T10:35:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /birds/records:
+    get:
+      tags: [Birds]
+      summary: 查询识别记录
+      description: 分页查询当前用户的识别历史记录。
+      operationId: listBirdRecords
+      x-idempotent: true
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BirdRecordPageResponse"
+              examples:
+                success:
+                  value:
+                    code: 0
+                    message: ok
+                    data:
+                      list:
+                        - recordId: 101
+                          birdName: 白鹭
+                          confidence: 0.9342
+                          imageUrl: /uploads/20260309_xxx.jpg
+                          createdAt: "2026-03-09T10:35:00Z"
+                      total: 1
+                      page: 1
+                      pageSize: 10
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /posts:
+    post:
+      tags: [Posts]
+      summary: 发布动态
+      description: 发布一条社区动态。
+      operationId: createPost
+      x-idempotent: false
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        description: 动态内容
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostRequest"
+            examples:
+              default:
+                value:
+                  content: 今天在湿地拍到了白鹭！
+                  imageUrl: /uploads/post_001.jpg
+      responses:
+        "201":
+          description: 发布成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatePostResponse"
+              examples:
+                created:
+                  value:
+                    code: 0
+                    message: ok
+                    data:
+                      postId: 1001
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    get:
+      tags: [Posts]
+      summary: 获取动态列表
+      description: 分页获取社区动态列表（公开接口），支持关键词筛选。
+      operationId: listPosts
+      x-idempotent: true
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - $ref: "#/components/parameters/KeywordParam"
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostPageResponse"
+              examples:
+                success:
+                  value:
+                    code: 0
+                    message: ok
+                    data:
+                      list:
+                        - postId: 1001
+                          content: 今天在湿地拍到了白鹭！
+                          imageUrl: /uploads/post_001.jpg
+                          likeCount: 12
+                          commentCount: 3
+                          createdAt: "2026-03-09T12:00:00Z"
+                          author:
+                            id: 1
+                            username: birdlover
+                            avatarUrl: ""
+                      total: 23
+                      page: 1
+                      pageSize: 10
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /posts/{postId}:
+    get:
+      tags: [Posts]
+      summary: 获取动态详情
+      description: 根据动态 ID 获取单条动态详情。
+      operationId: getPostDetail
+      x-idempotent: true
+      parameters:
+        - $ref: "#/components/parameters/PostIdParam"
+      responses:
+        "200":
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Posts]
+      summary: 更新动态
+      description: 更新当前用户自己发布的动态。
+      operationId: updatePost
+      x-idempotent: false
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatePostResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Posts]
+      summary: 删除动态
+      description: 删除当前用户自己发布的动态。
+      operationId: deletePost
+      x-idempotent: true
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostIdParam"
+      responses:
+        "200":
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletePostResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /posts/{postId}/like:
+    post:
+      tags: [Posts]
+      summary: 点赞动态
+      description: >
+        对指定动态点赞。该接口建议服务端实现为幂等（重复请求不重复计数）。
+      operationId: likePost
+      x-idempotent: true
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostIdParam"
+      responses:
+        "200":
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LikePostResponse"
+              examples:
+                success:
+                  value:
+                    code: 0
+                    message: ok
+                    data:
+                      postId: 1001
+                      liked: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /posts/{postId}/comments:
+    post:
+      tags: [Posts]
+      summary: 评论动态
+      description: 对指定动态发表评论，支持 parentId 作为回复上级评论。
+      operationId: createPostComment
+      x-idempotent: false
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PostIdParam"
+      requestBody:
+        required: true
+        description: 评论内容
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+            examples:
+              default:
+                value:
+                  content: 拍得很清晰！
+                  parentId: null
+      responses:
+        "201":
+          description: 评论成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateCommentResponse"
+              examples:
+                created:
+                  value:
+                    code: 0
+                    message: ok
+                    data:
+                      commentId: 501
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT 身份验证
+        使用格式：Authorization: Bearer <token>
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: 页码，从 1 开始。
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      example: 1
+    PageSizeParam:
+      name: pageSize
+      in: query
+      description: 每页数量。
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+      example: 10
+    KeywordParam:
+      name: keyword
+      in: query
+      description: 按动态内容关键词筛选。
+      required: false
+      schema:
+        type: string
+        default: ""
+      example: 白鹭
+    PostIdParam:
+      name: postId
+      in: path
+      description: 动态 ID。
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      example: 1001
+
+  responses:
+    BadRequest:
+      description: 请求参数不合法
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: 1001
+            message: 参数错误
+            data: null
+    Unauthorized:
+      description: 未登录或令牌无效
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: 1002
+            message: 未登录或 Token 无效
+            data: null
+    NotFound:
+      description: 目标资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: 1004
+            message: 资源不存在
+            data: null
+    Conflict:
+      description: 资源冲突（如重复注册、重复点赞）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: 1009
+            message: 资源冲突
+            data: null
+    InternalError:
+      description: 服务内部异常
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: 1005
+            message: 服务内部错误
+            data: null
+
+  schemas:
+    ResponseBase:
+      type: object
+      description: 通用响应基础结构。
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          description: 业务状态码，0 表示成功。
+          example: 0
+        message:
+          type: string
+          description: 响应提示信息。
+          example: ok
+        data:
+          description: 业务数据，失败时通常为 null。
+          nullable: true
+
+    ErrorResponse:
+      type: object
+      description: 统一错误响应结构。
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          description: 错误码。
+          example: 1001
+        message:
+          type: string
+          description: 错误描述。
+          example: 参数错误
+        data:
+          type: object
+          nullable: true
+          description: 错误附加信息，默认 null。
+          additionalProperties: true
+          example: null
+
+    HealthData:
+      type: object
+      description: 健康检查数据。
+      required: [service, status, database, time]
+      properties:
+        service:
+          type: string
+          description: 服务名称。
+          example: backend
+        status:
+          type: string
+          description: 服务状态。
+          example: running
+        database:
+          type: string
+          description: 数据库连接状态。
+          example: connected
+        time:
+          type: string
+          format: date-time
+          description: 服务当前时间（UTC）。
+          example: "2026-03-25T09:30:00Z"
+
+    HealthResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/HealthData"
+
+    RegisterRequest:
+      type: object
+      description: 用户注册请求体。
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+          minLength: 2
+          maxLength: 50
+          description: 用户名（唯一）。
+          example: birdlover
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          description: 邮箱（唯一）。
+          example: bird@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 64
+          description: 登录密码。
+          example: "12345678"
+
+    RegisterResponseData:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: integer
+          description: 新用户 ID。
+          example: 1
+
+    RegisterResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/RegisterResponseData"
+
+    LoginRequest:
+      type: object
+      description: 用户登录请求体。
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          description: 注册邮箱。
+          example: bird@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 64
+          description: 登录密码。
+          example: "12345678"
+
+    UserBrief:
+      type: object
+      description: 用户简要信息。
+      required: [id, username, avatarUrl]
+      properties:
+        id:
+          type: integer
+          description: 用户 ID。
+          example: 1
+        username:
+          type: string
+          description: 用户名。
+          example: birdlover
+        avatarUrl:
+          type: string
+          description: 头像 URL。
+          example: ""
+
+    LoginResponseData:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          description: JWT 访问令牌。
+          example: jwt-token
+        user:
+          $ref: "#/components/schemas/UserBrief"
+
+    LoginResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/LoginResponseData"
+
+    LogoutResponseData:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          example: true
+
+    LogoutResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/LogoutResponseData"
+
+    UserProfile:
+      type: object
+      description: 当前用户完整资料。
+      required: [id, username, email, avatarUrl, createdAt]
+      properties:
+        id:
+          type: integer
+          description: 用户 ID。
+          example: 1
+        username:
+          type: string
+          description: 用户名。
+          example: birdlover
+        email:
+          type: string
+          format: email
+          description: 用户邮箱。
+          example: bird@example.com
+        avatarUrl:
+          type: string
+          description: 头像 URL。
+          example: ""
+        createdAt:
+          type: string
+          format: date-time
+          description: 账号创建时间。
+          example: "2026-03-09T10:30:00Z"
+
+    UserProfileResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/UserProfile"
+
+    RecognizeResponseData:
+      type: object
+      description: 图片识别结果。
+      required: [recordId, birdName, confidence, imageUrl, createdAt]
+      properties:
+        recordId:
+          type: integer
+          description: 识别记录 ID。
+          example: 101
+        birdName:
+          type: string
+          description: 识别出的鸟类名称。
+          example: 白鹭
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: 识别置信度（0~1）。
+          example: 0.9342
+        imageUrl:
+          type: string
+          description: 图片存储地址。
+          example: /uploads/20260309_xxx.jpg
+        createdAt:
+          type: string
+          format: date-time
+          description: 识别时间。
+          example: "2026-03-09T10:35:00Z"
+
+    RecognizeResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/RecognizeResponseData"
+
+    BirdRecordItem:
+      type: object
+      description: 识别记录项。
+      required: [recordId, birdName, confidence, imageUrl, createdAt]
+      properties:
+        recordId:
+          type: integer
+          description: 记录 ID。
+          example: 101
+        birdName:
+          type: string
+          description: 鸟类名称。
+          example: 白鹭
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: 置信度。
+          example: 0.9342
+        imageUrl:
+          type: string
+          description: 图片 URL。
+          example: /uploads/20260309_xxx.jpg
+        createdAt:
+          type: string
+          format: date-time
+          description: 识别时间。
+          example: "2026-03-09T10:35:00Z"
+
+    BirdRecordPageData:
+      type: object
+      description: 识别记录分页数据。
+      required: [list, total, page, pageSize]
+      properties:
+        list:
+          type: array
+          description: 记录列表。
+          items:
+            $ref: "#/components/schemas/BirdRecordItem"
+        total:
+          type: integer
+          description: 总记录数。
+          example: 1
+        page:
+          type: integer
+          description: 当前页码。
+          example: 1
+        pageSize:
+          type: integer
+          description: 每页条数。
+          example: 10
+
+    BirdRecordPageResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/BirdRecordPageData"
+
+    CreatePostRequest:
+      type: object
+      description: 发布动态请求体。
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: 动态文本内容。
+          example: 今天在湿地拍到了白鹭！
+        imageUrl:
+          type: string
+          nullable: true
+          description: 动态图片 URL（可选）。
+          example: /uploads/post_001.jpg
+
+    CreatePostResponseData:
+      type: object
+      required: [postId]
+      properties:
+        postId:
+          type: integer
+          description: 新建动态 ID。
+          example: 1001
+
+    CreatePostResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/CreatePostResponseData"
+
+    PostAuthor:
+      type: object
+      description: 动态作者信息。
+      required: [id, username, avatarUrl]
+      properties:
+        id:
+          type: integer
+          description: 作者 ID。
+          example: 1
+        username:
+          type: string
+          description: 作者用户名。
+          example: birdlover
+        avatarUrl:
+          type: string
+          description: 作者头像 URL。
+          example: ""
+
+    PostItem:
+      type: object
+      description: 动态列表项。
+      required: [postId, content, likeCount, commentCount, createdAt, author]
+      properties:
+        postId:
+          type: integer
+          description: 动态 ID。
+          example: 1001
+        content:
+          type: string
+          description: 动态内容。
+          example: 今天在湿地拍到了白鹭！
+        imageUrl:
+          type: string
+          nullable: true
+          description: 图片 URL。
+          example: /uploads/post_001.jpg
+        likeCount:
+          type: integer
+          description: 点赞数。
+          example: 12
+        commentCount:
+          type: integer
+          description: 评论数。
+          example: 3
+        createdAt:
+          type: string
+          format: date-time
+          description: 发布时间。
+          example: "2026-03-09T12:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新时间。
+          example: "2026-03-09T12:30:00Z"
+        author:
+          $ref: "#/components/schemas/PostAuthor"
+
+    PostPageData:
+      type: object
+      description: 动态分页数据。
+      required: [list, total, page, pageSize]
+      properties:
+        list:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostItem"
+        total:
+          type: integer
+          description: 总动态数。
+          example: 23
+        page:
+          type: integer
+          description: 当前页码。
+          example: 1
+        pageSize:
+          type: integer
+          description: 每页条数。
+          example: 10
+
+    PostPageResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/PostPageData"
+
+    PostDetailResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/PostItem"
+
+    LikePostResponseData:
+      type: object
+      required: [postId, liked]
+      properties:
+        postId:
+          type: integer
+          description: 动态 ID。
+          example: 1001
+        liked:
+          type: boolean
+          description: 当前用户点赞状态。
+          example: true
+
+    LikePostResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/LikePostResponseData"
+
+    CreateCommentRequest:
+      type: object
+      description: 发布评论请求体。
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: 评论内容。
+          example: 拍得很清晰！
+        parentId:
+          type: integer
+          nullable: true
+          description: 父评论 ID；为 null 表示一级评论。
+          example: null
+
+    CreateCommentResponseData:
+      type: object
+      required: [commentId]
+      properties:
+        commentId:
+          type: integer
+          description: 新评论 ID。
+          example: 501
+
+    CreateCommentResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/CreateCommentResponseData"
+
+    DeletePostResponseData:
+      type: object
+      required: [postId, deleted]
+      properties:
+        postId:
+          type: integer
+          example: 1001
+        deleted:
+          type: boolean
+          example: true
+
+    DeletePostResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: "#/components/schemas/DeletePostResponseData"
