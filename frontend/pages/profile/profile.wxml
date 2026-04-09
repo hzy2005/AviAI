@@ -3,7 +3,6 @@
     <view class="hero" bindtap="onChangeCover">
       <image class="hero-bg" src="{{coverImage}}" mode="aspectFill" />
       <view class="hero-mask"></view>
-      <view class="hero-tip">Tap to change cover</view>
     </view>
 
     <view class="avatar-wrap">

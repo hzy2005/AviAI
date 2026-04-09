@@ -14,26 +14,37 @@
 
     <view class="field-wrap">
       <input class="field" type="text" value="{{form.username}}" placeholder="@naufalaziz" placeholder-class="field-placeholder" data-key="username" bindinput="onInput" />
+      <image class="field-icon" src="/static/icons/icon-user.png" />
     </view>
 
     <view class="field-wrap">
       <input class="field" type="number" value="{{form.phone}}" placeholder="08123456789" placeholder-class="field-placeholder" data-key="phone" bindinput="onInput" />
+      <image class="field-icon" src="/static/icons/icon-phone.png" />
     </view>
 
     <view class="field-wrap">
       <input class="field" type="text" value="{{form.email}}" placeholder="naufalaziz@email.com" placeholder-class="field-placeholder" data-key="email" bindinput="onInput" />
+      <image class="field-icon" src="/static/icons/icon-user.png" />
     </view>
 
     <view class="field-wrap">
       <input class="field" password="{{!showPassword}}" value="{{form.password}}" placeholder="Password" placeholder-class="field-placeholder" data-key="password" bindinput="onInput" />
+      <image
+        class="field-icon"
+        src="{{showPassword ? '/static/icons/eye-open.png' : '/static/icons/eye-close.png'}}"
+        bindtap="togglePassword"
+      />
     </view>
 
-    <view class="field-wrap password-wrap">
-      <input class="field password-field" password="{{!showPassword}}" value="{{form.confirmPassword}}" placeholder="Confirm Password" placeholder-class="field-placeholder" data-key="confirmPassword" bindinput="onInput" />
-      <text class="show-text" bindtap="togglePassword">{{showPassword ? 'HIDE' : 'SHOW'}}</text>
+    <view class="field-wrap">
+      <input class="field" password="{{!showPassword}}" value="{{form.confirmPassword}}" placeholder="Confirm Password" placeholder-class="field-placeholder" data-key="confirmPassword" bindinput="onInput" />
     </view>
 
-    <button class="done-btn" loading="{{loading}}" bindtap="onDone">Done</button>
-    <button class="cancel-btn" bindtap="onCancel">Cancel</button>
+    <view class="btn-wrap">
+      <button class="primary-btn" loading="{{loading}}" bindtap="onDone">Done</button>
+    </view>
+    <view class="btn-wrap secondary-wrap">
+      <button class="secondary-btn" bindtap="onCancel">Cancel</button>
+    </view>
   </view>
 </view>

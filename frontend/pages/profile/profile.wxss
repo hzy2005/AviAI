@@ -25,17 +25,6 @@
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.36));
 }
 
-.hero-tip {
-  position: absolute;
-  right: 24rpx;
-  top: 24rpx;
-  padding: 10rpx 16rpx;
-  border-radius: 14rpx;
-  font-size: 22rpx;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.2);
-}
-
 .avatar-wrap {
   width: 100%;
   margin-top: -90rpx;
