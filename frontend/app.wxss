@@ -1,5 +1,18 @@
 page {
-  background: #f5f7fb;
-  color: #1f2937;
+  background: #f2f4f3;
+  color: #18211b;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+button {
+  border: none;
+}
+
+button::after {
+  border: none;
+}
+
+input,
+textarea {
+  color: #1f2b24;
 }

@@ -1,24 +1,41 @@
 const { apiClient } = require("./client");
-const { baseUrl } = require("../../config/env");
+const { baseUrl, enableOfflineMock, preferOfflineMock } = require("../../config/env");
+const { getMockRecognizeResponse } = require("../../utils/mock-api");
 
 function recognize(filePath) {
   const token = wx.getStorageSync("accessToken");
 
   return new Promise((resolve, reject) => {
+    if (preferOfflineMock && enableOfflineMock) {
+      resolve(getMockRecognizeResponse(filePath));
+      return;
+    }
+
     wx.uploadFile({
       url: `${baseUrl}/api/v1/birds/recognize`,
       filePath,
       name: "image",
       header: token ? { Authorization: `Bearer ${token}` } : {},
       success: (res) => {
-        const data = JSON.parse(res.data || "{}");
+        let data = {};
+        try {
+          data = JSON.parse(res.data || "{}");
+        } catch (error) {
+          data = {};
+        }
         if (res.statusCode >= 200 && res.statusCode < 300 && data.code === 0) {
           resolve(data);
           return;
         }
         reject(data);
       },
-      fail: reject
+      fail: (error) => {
+        if (enableOfflineMock && error && error.errMsg && error.errMsg.indexOf("request:fail") >= 0) {
+          resolve(getMockRecognizeResponse(filePath));
+          return;
+        }
+        reject(error);
+      }
     });
   });
 }

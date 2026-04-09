@@ -1,0 +1,107 @@
+<view class="page">
+  <view class="nav" style="padding-top: {{statusBarHeight}}px;">
+    <view class="nav-inner">
+      <view class="nav-btn" bindtap="onBack">
+        <image class="nav-icon-image" src="{{iconBack}}" mode="aspectFit" />
+      </view>
+      <view class="nav-btn nav-placeholder"></view>
+    </view>
+  </view>
+
+  <view wx:if="{{detail}}">
+    <view class="hero-wrap">
+      <swiper wx:if="{{imageList.length}}" class="hero-swiper" indicator-dots="{{imageList.length > 1}}" indicator-color="rgba(255,255,255,0.45)" indicator-active-color="#ffffff" circular="{{imageList.length > 1}}">
+        <swiper-item wx:for="{{imageList}}" wx:key="*this">
+          <image class="hero-image" src="{{item}}" mode="aspectFill" data-src="{{item}}" bindtap="onPreviewImage" />
+          <view class="hero-mask"></view>
+          <view class="hero-name">{{detail.author.username || 'Bird Lover'}}</view>
+        </swiper-item>
+      </swiper>
+      <view wx:else class="hero-empty">
+        <view class="hero-name">{{detail.author.username || 'Bird Lover'}}</view>
+      </view>
+    </view>
+
+    <view class="talk-block">
+      <text class="talk-title">Talk</text>
+      <view class="talk-content-wrap">
+        <text class="talk-content {{isTalkExpanded ? 'expanded' : 'collapsed'}}">{{detail.content || 'No description yet.'}}</text>
+        <text wx:if="{{showReadMore}}" class="read-more" bindtap="onToggleTalk">{{isTalkExpanded ? 'Collapse' : 'Read more'}}</text>
+      </view>
+
+      <view class="action-row">
+        <view class="action-icon-btn {{liked ? 'active' : ''}}" bindtap="onLike">
+          <image class="action-icon-image" src="{{iconLike}}" mode="aspectFit" />
+        </view>
+        <view class="action-icon-btn" bindtap="onOpenCommentModal">
+          <image class="action-icon-image" src="{{iconComment}}" mode="aspectFit" />
+        </view>
+        <view class="action-icon-btn" bindtap="onTapShare">
+          <image class="action-icon-image" src="{{iconShare}}" mode="aspectFit" />
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{commentTree.length}}" class="comment-list">
+      <view wx:for="{{commentTree}}" wx:key="commentId" class="comment-item" data-id="{{item.commentId}}" data-user-id="{{item.userId}}" data-username="{{item.username}}" bindlongpress="onLongPressComment">
+        <view class="comment-main">
+          <image class="avatar" src="{{item.avatarUrl || defaultAvatar}}" mode="aspectFill" />
+          <view class="comment-body">
+            <text class="name">{{item.username}}</text>
+            <text class="text">{{item.content}}</text>
+            <view class="comment-images" wx:if="{{item.imageUrls.length}}">
+              <image wx:for="{{item.imageUrls}}" wx:key="*this" class="comment-image" src="{{item}}" mode="aspectFill" data-src="{{item}}" catchtap="onPreviewCommentImage" />
+            </view>
+            <view class="comment-foot">
+              <text class="time">{{item.createdAtText}}</text>
+              <view class="reply-btn" data-id="{{item.commentId}}" data-user-id="{{item.userId}}" data-username="{{item.username}}" bindtap="onReplyComment">
+                <image class="reply-icon-image" src="{{iconComment}}" mode="aspectFit" />
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{item.replies.length}}" class="reply-list">
+          <view wx:for="{{item.replies}}" wx:key="commentId" class="reply-item" data-id="{{item.commentId}}" data-user-id="{{item.userId}}" data-username="{{item.username}}" catchlongpress="onLongPressComment">
+            <text class="reply-name">{{item.username}}</text>
+            <text class="reply-text">{{item.content}}</text>
+            <view class="reply-images" wx:if="{{item.imageUrls.length}}">
+              <image wx:for="{{item.imageUrls}}" wx:key="*this" class="reply-image" src="{{item}}" mode="aspectFill" data-src="{{item}}" catchtap="onPreviewCommentImage" />
+            </view>
+            <view class="reply-foot">
+              <text class="reply-time">{{item.createdAtText}}</text>
+              <view class="reply-btn small" data-id="{{item.commentId}}" data-user-id="{{item.userId}}" data-username="{{item.username}}" catchtap="onReplyComment">
+                <image class="reply-icon-image" src="{{iconComment}}" mode="aspectFit" />
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:else class="hint">No comments yet. Tap comment icon to add the first one.</view>
+  </view>
+
+  <view wx:else class="empty">Loading...</view>
+
+  <view wx:if="{{showCommentModal}}" class="modal-mask" bindtap="onCloseCommentModal">
+    <view class="comment-modal" catchtap="onStopBubble">
+      <view class="modal-head">
+        <text class="modal-title">{{replyTarget ? ('Reply @' + replyTarget.username) : 'Write a comment'}}</text>
+        <text class="modal-close" bindtap="onCloseCommentModal">x</text>
+      </view>
+
+      <textarea class="modal-textarea" placeholder="Share your thoughts..." maxlength="500" value="{{draftCommentText}}" bindinput="onDraftCommentInput" />
+
+      <view class="draft-images">
+        <view wx:for="{{draftCommentImages}}" wx:key="*this" class="draft-image-item">
+          <image class="draft-image" src="{{item}}" mode="aspectFill" />
+          <view class="draft-remove" data-index="{{index}}" bindtap="onRemoveDraftCommentImage">x</view>
+        </view>
+        <view wx:if="{{draftCommentImages.length < 3}}" class="add-image" bindtap="onChooseCommentImages">+ Image</view>
+      </view>
+
+      <button class="submit-btn" loading="{{submittingComment}}" bindtap="onSubmitComment">Publish</button>
+    </view>
+  </view>
+</view>

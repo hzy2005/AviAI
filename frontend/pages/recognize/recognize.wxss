@@ -1,0 +1,53 @@
+.page {
+  min-height: 100vh;
+  padding: 22rpx;
+  box-sizing: border-box;
+  background: #f0f2f1;
+}
+
+.card,
+.empty {
+  border-radius: 24rpx;
+  background: #ffffff;
+  padding: 20rpx;
+}
+
+.hero {
+  width: 100%;
+  height: 420rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(130deg, #94a8be, #e0d9b2);
+}
+
+.placeholder {
+  background: linear-gradient(130deg, #a5b4c0, #ccd0c4);
+}
+
+.name {
+  margin-top: 18rpx;
+  font-size: 56rpx;
+  font-weight: 700;
+  color: #1f2c26;
+}
+
+.score,
+.time,
+.record {
+  margin-top: 8rpx;
+  font-size: 27rpx;
+  color: #576962;
+}
+
+.post-btn {
+  margin-top: 20rpx;
+  border-radius: 999rpx;
+  background: #3a835e;
+  color: #ffffff;
+  font-size: 30rpx;
+}
+
+.empty {
+  text-align: center;
+  font-size: 25rpx;
+  color: #7f8d86;
+}

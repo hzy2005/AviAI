@@ -1,0 +1,123 @@
+<view class="page">
+  <view class="bg-lines"></view>
+  <view class="bg-lines bg-lines-br bg-lines-br-outer"></view>
+  <view class="bg-lines bg-lines-br bg-lines-br-inner"></view>
+
+  <view class="top-bar">
+    <text class="title">Share and Talk</text>
+  </view>
+
+  <scroll-view class="feed-scroll" scroll-y="true" enable-flex="true">
+    <view class="masonry">
+      <view class="column">
+        <view wx:for="{{leftFeed}}" wx:key="postId" class="post-card {{item.sizeClass}}" bindtap="onOpenDetail" data-id="{{item.postId}}">
+          <image wx:if="{{item.fullImageUrl}}" class="post-image" src="{{item.fullImageUrl}}" mode="aspectFill" data-src="{{item.fullImageUrl}}" bindtap="onPreviewImage" />
+          <view wx:else class="post-image placeholder"></view>
+          <view class="overlay"></view>
+          <view class="card-meta">
+            <text class="views">{{item.viewsText}}</text>
+            <text class="name">{{item.displayTitle}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="column">
+        <view wx:for="{{rightFeed}}" wx:key="postId" class="post-card {{item.sizeClass}}" bindtap="onOpenDetail" data-id="{{item.postId}}">
+          <image wx:if="{{item.fullImageUrl}}" class="post-image" src="{{item.fullImageUrl}}" mode="aspectFill" data-src="{{item.fullImageUrl}}" bindtap="onPreviewImage" />
+          <view wx:else class="post-image placeholder"></view>
+          <view class="overlay"></view>
+          <view class="card-meta">
+            <text class="views">{{item.viewsText}}</text>
+            <text class="name">{{item.displayTitle}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{!posts.length && !loading}}" class="empty">No posts yet</view>
+  </scroll-view>
+
+  <view class="fab-wrap">
+    <view class="fab search" bindtap="onTapSearch">
+      <image class="fab-icon" src="/static/icons/icon-search.svg" mode="aspectFit" />
+    </view>
+    <view class="fab pen" bindtap="onOpenManageModal">
+      <image class="fab-icon" src="/static/icons/icon-edit.svg" mode="aspectFit" />
+    </view>
+    <view class="fab plus" bindtap="onOpenCreateModal">
+      <image class="fab-icon" src="/static/icons/icon-add.svg" mode="aspectFit" />
+    </view>
+  </view>
+
+  <view wx:if="{{showMask}}" class="modal-mask" bindtap="onCloseModal">
+    <view class="modal-card" catchtap="onStopBubble">
+      <view wx:if="{{showSearch}}">
+        <view class="modal-title">Search</view>
+        <input class="search-input" placeholder="Search posts" value="{{searchInput}}" bindinput="onSearchInput" />
+        <view class="modal-actions">
+          <button class="small-btn primary" bindtap="onApplySearch">Apply</button>
+          <button class="small-btn ghost" bindtap="onClearSearch">Clear</button>
+        </view>
+      </view>
+
+      <view wx:if="{{showCreateModal}}">
+        <view class="modal-title">Create Post</view>
+        <textarea class="draft-input" placeholder="Write something about your birding moment..." value="{{draftContent}}" maxlength="1000" bindinput="onDraftInput" />
+
+        <view class="thumb-list">
+          <view wx:for="{{draftImages}}" wx:key="*this" class="thumb-item">
+            <image class="thumb-image" src="{{item}}" mode="aspectFill" />
+            <view class="thumb-remove" data-index="{{index}}" bindtap="onRemoveDraftImage">x</view>
+          </view>
+          <view wx:if="{{!draftImages.length}}" class="draft-placeholder">No image selected</view>
+        </view>
+
+        <view class="modal-actions">
+          <button class="small-btn" bindtap="onChooseDraftImages">Add Photos</button>
+          <button class="small-btn primary" loading="{{submitting}}" bindtap="onSubmitPost">Publish</button>
+        </view>
+      </view>
+
+      <view wx:if="{{showManageModal}}">
+        <view class="modal-title">My Posts</view>
+
+        <scroll-view class="manage-list" scroll-y="true">
+          <view wx:if="{{myPosts.length}}">
+            <view wx:for="{{myPosts}}" wx:key="postId" class="manage-item">
+              <view wx:if="{{editingPostId !== item.postId}}">
+                <view class="manage-content">{{item.content}}</view>
+                <view class="manage-time">{{item.createdAtText}}</view>
+                <view class="modal-actions">
+                  <button class="small-btn edit-btn" data-id="{{item.postId}}" bindtap="onEditStart">
+                    <image class="btn-icon" src="/static/icons/icon-edit.svg" mode="aspectFit" />
+                    <text>Edit</text>
+                  </button>
+                  <button class="small-btn ghost" data-id="{{item.postId}}" bindtap="onDeletePost">Delete</button>
+                </view>
+              </view>
+
+              <view wx:else>
+                <textarea class="draft-input" value="{{editingContent}}" maxlength="1000" bindinput="onEditInput" />
+
+                <view class="thumb-list">
+                  <view wx:for="{{editingImages}}" wx:key="*this" class="thumb-item">
+                    <image class="thumb-image" src="{{item}}" mode="aspectFill" />
+                    <view class="thumb-remove" data-index="{{index}}" bindtap="onRemoveEditImage">x</view>
+                  </view>
+                  <view wx:if="{{!editingImages.length}}" class="draft-placeholder">No image selected</view>
+                </view>
+
+                <view class="modal-actions">
+                  <button class="small-btn" bindtap="onChooseEditImages">Add Photos</button>
+                  <button class="small-btn primary" data-id="{{item.postId}}" bindtap="onEditSave">Save</button>
+                  <button class="small-btn ghost" bindtap="onEditCancel">Cancel</button>
+                </view>
+              </view>
+            </view>
+          </view>
+          <view wx:else class="empty">No posts from you yet</view>
+        </scroll-view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,16 @@
+<view class="splash-page">
+  <image class="bg-image" src="/static/view/BlueBird.png" mode="aspectFill" />
+  <view class="bg-glow bg-glow-1"></view>
+  <view class="bg-glow bg-glow-2"></view>
+
+  <view class="brand-row">
+    <text class="brand-main">Avi</text>
+    <text class="brand-sub">AI</text>
+  </view>
+
+  <view class="bottom-action">
+    <button class="explore-btn" bindtap="onExplore" hover-class="explore-btn-hover">
+      Explore
+    </button>
+  </view>
+</view>

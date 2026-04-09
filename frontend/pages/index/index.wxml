@@ -1,123 +1,32 @@
 <view class="page">
-  <view class="hero">
-    <view class="hero-badge">AviAI API Demo</view>
-    <view class="hero-title">小程序联调工作台</view>
-    <view class="hero-desc">
-      在一个页面里完成登录、发帖、查询、点赞、删除和图片识别，方便做课程作业截图。
-    </view>
-    <view wx:if="{{loadingText}}" class="status-banner">{{loadingText}}</view>
-  </view>
+  <view class="hero {{backgroundImage ? 'has-image' : ''}}">
+    <image wx:if="{{backgroundImage}}" class="hero-bg" src="{{backgroundImage}}" mode="aspectFill" />
+    <image wx:else class="hero-bg" src="/static/view/Homepage Background.jpg" mode="aspectFill" />
+    <view wx:if="{{backgroundImage}}" class="hero-mask"></view>
 
-  <view class="panel">
-    <view class="panel-title">1. 健康检查</view>
-    <view class="panel-desc">先确认后端服务可访问。</view>
-    <button class="primary-btn" bindtap="onCheckHealth">检查 /api/v1/health</button>
-    <view class="console-box">
-      <text class="console-text">{{healthText}}</text>
-    </view>
-  </view>
-
-  <view class="panel">
-    <view class="panel-title">2. 登录与用户信息</view>
-    <view class="panel-desc">默认填好了演示账号，可直接登录。</view>
-
-    <input class="field" type="text" value="{{email}}" placeholder="邮箱" bindinput="onEmailInput" />
-    <input class="field" password="true" value="{{password}}" placeholder="密码" bindinput="onPasswordInput" />
-
-    <view class="actions">
-      <button class="primary-btn half-btn" bindtap="onQuickLogin">登录</button>
-      <button class="ghost-btn half-btn" bindtap="onLogout">登出</button>
+    <view wx:if="{{recognized}}" class="tag-bar" bindtap="onOpenBirdDetail">
+      <view>
+        <view class="tag-sub">Bird recognized</view>
+        <view class="tag-title">{{recognized.birdName}}</view>
+      </view>
+      <view class="info">i</view>
     </view>
 
-    <view class="token-tip">
-      Token 状态：
-      <text class="{{hasToken ? 'ok-text' : 'warn-text'}}">{{hasToken ? '已登录' : '未登录'}}</text>
-    </view>
+    <view class="sheet">
+      <view class="welcome">Welcome back!</view>
+      <view class="headline">Find Nature's Scenery</view>
 
-    <button class="secondary-btn" bindtap="onFetchUser">获取当前用户</button>
+      <button class="record-btn" loading="{{loading}}" bindtap="onStartRecording">
+        <text class="red-dot"></text>
+        <text>Start recording</text>
+      </button>
 
-    <view wx:if="{{currentUser}}" class="info-card">
-      <view class="info-title">{{currentUser.username}}</view>
-      <view class="info-line">邮箱：{{currentUser.email}}</view>
-      <view class="info-line">创建时间：{{currentUser.createdAt}}</view>
-    </view>
-  </view>
-
-  <view class="panel">
-    <view class="panel-title">3. 帖子 CRUD 与查询</view>
-    <view class="panel-desc">可发布、筛选、查看详情、点赞、更新和删除帖子。</view>
-
-    <textarea
-      class="textarea"
-      value="{{postContent}}"
-      maxlength="1000"
-      placeholder="输入要发布的动态内容"
-      bindinput="onPostContentInput"
-    />
-
-    <view class="actions">
-      <button class="primary-btn half-btn" bindtap="onCreatePost">发布帖子</button>
-      <button class="secondary-btn half-btn" bindtap="onFetchPosts">刷新列表</button>
-    </view>
-
-    <input class="field" type="text" value="{{keyword}}" placeholder="输入关键词筛选帖子" bindinput="onKeywordInput" />
-
-    <block wx:if="{{posts.length}}">
-      <view wx:for="{{posts}}" wx:key="postId" class="post-card">
-        <view class="post-head">
-          <view>
-            <view class="post-author">{{item.author.username}}</view>
-            <view class="post-time">{{item.createdAt}}</view>
-          </view>
-          <view class="post-meta">#{{item.postId}}</view>
-        </view>
-        <view class="post-content">{{item.content}}</view>
-        <view class="post-stats">点赞 {{item.likeCount}} · 评论 {{item.commentCount}}</view>
-        <view class="mini-actions">
-          <button class="mini-btn" data-id="{{item.postId}}" bindtap="onViewPostDetail">详情</button>
-          <button class="mini-btn" data-id="{{item.postId}}" bindtap="onLikePost">点赞</button>
-          <button class="mini-btn" data-id="{{item.postId}}" data-content="{{item.content}}" bindtap="onUpdatePost">更新</button>
-          <button class="mini-btn danger-btn" data-id="{{item.postId}}" bindtap="onDeletePost">删除</button>
+      <view class="quick-row">
+        <view class="quick-item" bindtap="onSelectPhoto">Photo</view>
+        <view class="quick-item {{isMyBird ? 'active' : ''}}" bindtap="onMarkAsMyBird">
+          {{isMyBird ? 'Added!' : 'I saw it!'}}
         </view>
       </view>
-    </block>
-
-    <view wx:else class="empty-card">当前没有帖子数据，点击“刷新列表”或先发布一条。</view>
-  </view>
-
-  <view class="panel">
-    <view class="panel-title">4. 识别记录与图片识别</view>
-    <view class="panel-desc">登录后可读取识别记录，也可以直接选图调用识别接口。</view>
-
-    <view class="actions">
-      <button class="secondary-btn half-btn" bindtap="onFetchRecords">获取识别记录</button>
-      <button class="primary-btn half-btn" bindtap="onChooseImageRecognize">选择图片识别</button>
-    </view>
-
-    <view wx:if="{{recognizeResult}}" class="info-card success-card">
-      <view class="info-title">最新识别结果</view>
-      <view class="info-line">鸟类：{{recognizeResult.birdName}}</view>
-      <view class="info-line">置信度：{{recognizeResult.confidence}}</view>
-      <view class="info-line">图片：{{recognizeResult.imageUrl}}</view>
-    </view>
-
-    <block wx:if="{{records.length}}">
-      <view wx:for="{{records}}" wx:key="recordId" class="record-card">
-        <view class="record-name">{{item.birdName}}</view>
-        <view class="record-line">记录 ID：{{item.recordId}}</view>
-        <view class="record-line">置信度：{{item.confidence}}</view>
-        <view class="record-line">时间：{{item.createdAt}}</view>
-      </view>
-    </block>
-
-    <view wx:else class="empty-card">暂无识别记录，先登录后获取，或上传一张图片试试。</view>
-  </view>
-
-  <view class="panel">
-    <view class="panel-title">{{lastResultTitle}}</view>
-    <view class="panel-desc">截图时这一块最有用，能直接展示接口返回结构。</view>
-    <view class="console-box result-console">
-      <text class="console-text">{{lastResultText}}</text>
     </view>
   </view>
 </view>
