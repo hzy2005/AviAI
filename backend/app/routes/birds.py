@@ -12,7 +12,12 @@ async def recognize_bird(
     image: UploadFile = File(...),
     current_user=Depends(get_current_user),
 ):
-    data, err = api_service.recognize_bird_for_user(current_user, image.filename)
+    file_bytes = await image.read()
+    data, err = api_service.recognize_bird_for_user(
+        current_user,
+        image.filename,
+        file_bytes,
+    )
     if err:
         return error(err[0], err[1], err[2])
     return success(data, status_code=201)

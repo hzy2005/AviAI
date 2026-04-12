@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -14,6 +16,10 @@ from app.routes.users import router as users_router
 
 app = FastAPI(title="AviAI API", version="0.3.0")
 
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+UPLOADS_DIR = BACKEND_ROOT / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,6 +27,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 @app.get("/api/v1/health")
 def health_check():

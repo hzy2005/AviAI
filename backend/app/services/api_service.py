@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
+from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -11,6 +13,10 @@ from app.models.comment import Comment
 from app.models.like import Like
 from app.models.post import Post
 from app.models.user import User
+
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+UPLOADS_DIR = BACKEND_ROOT / "uploads"
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
 
 def now_iso() -> str:
@@ -147,15 +153,33 @@ def get_user_profile(current_user: Optional[dict]):
     }, None
 
 
-def recognize_bird_for_user(current_user: Optional[dict], filename: Optional[str]):
+def _save_upload_file(filename: str, file_bytes: bytes) -> str:
+    suffix = Path(filename).suffix.lower()
+    safe_name = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:10]}{suffix}"
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    file_path = UPLOADS_DIR / safe_name
+    file_path.write_bytes(file_bytes)
+    return f"/uploads/{safe_name}"
+
+
+def recognize_bird_for_user(
+    current_user: Optional[dict],
+    filename: Optional[str],
+    file_bytes: Optional[bytes],
+):
     if not current_user:
         return None, (1002, "未登录或 Token 无效", 401)
     if not filename:
         return None, (1006, "上传文件不合法", 400)
+    if not file_bytes:
+        return None, (1006, "上传文件不合法", 400)
+
+    suffix = Path(filename).suffix.lower()
+    if suffix not in ALLOWED_IMAGE_EXTENSIONS:
+        return None, (1006, "上传文件不合法", 400)
 
     lowered_name = filename.lower()
-    if not lowered_name.endswith((".jpg", ".jpeg", ".png")):
-        return None, (1006, "上传文件不合法", 400)
+    image_url = _save_upload_file(filename, file_bytes)
 
     bird_name = "白鹭"
     confidence = 0.9342
@@ -169,7 +193,7 @@ def recognize_bird_for_user(current_user: Optional[dict], filename: Optional[str
                 user_id=current_user["id"],
                 bird_name=bird_name,
                 confidence=confidence,
-                image_url=f"/uploads/{filename}",
+                image_url=image_url,
             )
             db.add(record)
             db.commit()
