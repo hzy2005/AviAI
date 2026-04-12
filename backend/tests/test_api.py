@@ -232,6 +232,44 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(comment_not_found.status_code, 404)
         self.assertEqual(comment_not_found.json()["code"], 1004)
 
+    def test_posts_persistence_after_like_and_comment(self):
+        token = self.login()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        create_response = self.client.post(
+            "/api/v1/posts",
+            headers=headers,
+            json={"content": "persistence post", "imageUrl": "/uploads/persistence.jpg"},
+        )
+        self.assertEqual(create_response.status_code, 201)
+        post_id = create_response.json()["data"]["postId"]
+
+        like_response = self.client.post(f"/api/v1/posts/{post_id}/like", headers=headers)
+        self.assertEqual(like_response.status_code, 200)
+
+        comment_response = self.client.post(
+            f"/api/v1/posts/{post_id}/comments",
+            headers=headers,
+            json={"content": "persisted comment", "parentId": None},
+        )
+        self.assertEqual(comment_response.status_code, 201)
+
+        detail_response = self.client.get(f"/api/v1/posts/{post_id}")
+        self.assertEqual(detail_response.status_code, 200)
+        detail_data = detail_response.json()["data"]
+        self.assertEqual(detail_data["likeCount"], 1)
+        self.assertEqual(detail_data["commentCount"], 1)
+
+        list_response = self.client.get("/api/v1/posts?page=1&pageSize=10&keyword=persistence")
+        self.assertEqual(list_response.status_code, 200)
+        list_item = next(
+            (item for item in list_response.json()["data"]["list"] if item["postId"] == post_id),
+            None,
+        )
+        self.assertIsNotNone(list_item)
+        self.assertEqual(list_item["likeCount"], 1)
+        self.assertEqual(list_item["commentCount"], 1)
+
     def test_health(self):
         response = self.client.get("/api/v1/health")
         self.assertEqual(response.status_code, 200)

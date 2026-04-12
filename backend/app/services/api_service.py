@@ -2,12 +2,14 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import func, select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.core.auth import create_access_token, decode_access_token, hash_password, verify_password
 from app.db.session import SessionLocal
-from app.mock_data import STORE, paginate
 from app.models.bird_record import BirdRecord
+from app.models.comment import Comment
+from app.models.like import Like
+from app.models.post import Post
 from app.models.user import User
 
 
@@ -34,12 +36,24 @@ def _serialize_user_model(user: User) -> dict:
     }
 
 
-def find_user_by_id(user_id: int):
-    # Keep compatibility for mock-backed posts data.
-    mock_user = next((user for user in STORE["users"] if user["id"] == user_id), None)
-    if mock_user:
-        return mock_user
+def _serialize_post_item(post: Post, author: dict) -> dict:
+    return {
+        "postId": post.id,
+        "content": post.content,
+        "imageUrl": post.image_url,
+        "likeCount": int(post.like_count or 0),
+        "commentCount": int(post.comment_count or 0),
+        "createdAt": _dt_to_iso(post.created_at),
+        "updatedAt": _dt_to_iso(post.updated_at),
+        "author": {
+            "id": author["id"],
+            "username": author["username"],
+            "avatarUrl": author.get("avatarUrl", "") or "",
+        },
+    }
 
+
+def find_user_by_id(user_id: int):
     try:
         with SessionLocal() as db:
             user = db.get(User, user_id)
@@ -59,10 +73,6 @@ def find_user_by_email(email: str):
             return _serialize_user_model(user)
     except SQLAlchemyError:
         return None
-
-
-def find_post(post_id: int):
-    return next((post for post in STORE["posts"] if post["postId"] == post_id), None)
 
 
 def serialize_user_brief(user: dict):
@@ -218,125 +228,177 @@ def create_post(current_user: Optional[dict], content: str, image_url: Optional[
     if not current_user:
         return None, (1002, "未登录或 Token 无效", 401)
 
-    post = {
-        "postId": STORE["next_post_id"],
-        "userId": current_user["id"],
-        "content": content,
-        "imageUrl": image_url,
-        "likeUserIds": [],
-        "commentCount": 0,
-        "createdAt": now_iso(),
-        "updatedAt": now_iso(),
-    }
-    STORE["next_post_id"] += 1
-    STORE["posts"].insert(0, post)
-    return {"postId": post["postId"]}, None
-
-
-def build_post_item(post: dict):
-    user = find_user_by_id(post["userId"])
-    if not user:
-        return None
-    return {
-        "postId": post["postId"],
-        "content": post["content"],
-        "imageUrl": post["imageUrl"],
-        "likeCount": len(post["likeUserIds"]),
-        "commentCount": post["commentCount"],
-        "createdAt": post["createdAt"],
-        "updatedAt": post.get("updatedAt", post["createdAt"]),
-        "author": serialize_user_brief(user),
-    }
+    try:
+        with SessionLocal() as db:
+            post = Post(
+                user_id=current_user["id"],
+                content=content,
+                image_url=image_url,
+                like_count=0,
+                comment_count=0,
+            )
+            db.add(post)
+            db.commit()
+            db.refresh(post)
+            return {"postId": post.id}, None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
 
 
 def list_posts(page: int, page_size: int, keyword: Optional[str] = None):
-    items = []
-    normalized_keyword = (keyword or "").strip().lower()
-    for post in STORE["posts"]:
-        if normalized_keyword and normalized_keyword not in post["content"].lower():
-            continue
-        post_item = build_post_item(post)
-        if post_item:
-            items.append(post_item)
-    return paginate(items, page, page_size), None
+    normalized_keyword = (keyword or "").strip()
+
+    try:
+        with SessionLocal() as db:
+            query = select(Post)
+            count_query = select(func.count(Post.id))
+            if normalized_keyword:
+                like_keyword = f"%{normalized_keyword}%"
+                query = query.where(Post.content.ilike(like_keyword))
+                count_query = count_query.where(Post.content.ilike(like_keyword))
+
+            total = db.scalar(count_query) or 0
+            posts = db.scalars(
+                query
+                .order_by(Post.created_at.desc(), Post.id.desc())
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            ).all()
+
+            user_ids = [post.user_id for post in posts]
+            users = db.scalars(select(User).where(User.id.in_(user_ids))).all() if user_ids else []
+            users_map = {user.id: _serialize_user_model(user) for user in users}
+
+            items = []
+            for post in posts:
+                author = users_map.get(post.user_id)
+                if not author:
+                    continue
+                items.append(_serialize_post_item(post, author))
+
+            return {
+                "list": items,
+                "total": int(total),
+                "page": page,
+                "pageSize": page_size,
+            }, None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
 
 
 def get_post_detail(post_id: int):
-    post = find_post(post_id)
-    if not post:
-        return None, (1004, "资源不存在", 404)
-    return build_post_item(post), None
+    try:
+        with SessionLocal() as db:
+            post = db.get(Post, post_id)
+            if not post:
+                return None, (1004, "资源不存在", 404)
+
+            user = db.get(User, post.user_id)
+            if not user:
+                return None, (1004, "资源不存在", 404)
+
+            return _serialize_post_item(post, _serialize_user_model(user)), None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
 
 
 def update_post(current_user: Optional[dict], post_id: int, content: str, image_url: Optional[str]):
     if not current_user:
         return None, (1002, "未登录或 Token 无效", 401)
 
-    post = find_post(post_id)
-    if not post:
-        return None, (1004, "资源不存在", 404)
-    if post["userId"] != current_user["id"]:
-        return None, (1003, "无权限", 403)
+    try:
+        with SessionLocal() as db:
+            post = db.get(Post, post_id)
+            if not post:
+                return None, (1004, "资源不存在", 404)
+            if post.user_id != current_user["id"]:
+                return None, (1003, "无权限", 403)
 
-    post["content"] = content
-    post["imageUrl"] = image_url
-    post["updatedAt"] = now_iso()
-    return {"postId": post_id}, None
+            post.content = content
+            post.image_url = image_url
+            post.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            return {"postId": post_id}, None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
 
 
 def delete_post(current_user: Optional[dict], post_id: int):
     if not current_user:
         return None, (1002, "未登录或 Token 无效", 401)
 
-    post = find_post(post_id)
-    if not post:
-        return None, (1004, "资源不存在", 404)
-    if post["userId"] != current_user["id"]:
-        return None, (1003, "无权限", 403)
+    try:
+        with SessionLocal() as db:
+            post = db.get(Post, post_id)
+            if not post:
+                return None, (1004, "资源不存在", 404)
+            if post.user_id != current_user["id"]:
+                return None, (1003, "无权限", 403)
 
-    STORE["posts"] = [item for item in STORE["posts"] if item["postId"] != post_id]
-    STORE["comments"] = [item for item in STORE["comments"] if item["postId"] != post_id]
-    return {"postId": post_id, "deleted": True}, None
+            db.delete(post)
+            db.commit()
+            return {"postId": post_id, "deleted": True}, None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
 
 
 def like_post(current_user: Optional[dict], post_id: int):
     if not current_user:
         return None, (1002, "未登录或 Token 无效", 401)
 
-    post = find_post(post_id)
-    if not post:
-        return None, (1004, "资源不存在", 404)
+    try:
+        with SessionLocal() as db:
+            post = db.get(Post, post_id)
+            if not post:
+                return None, (1004, "资源不存在", 404)
 
-    if current_user["id"] in post["likeUserIds"]:
+            existing = db.scalar(
+                select(Like).where(
+                    Like.post_id == post_id,
+                    Like.user_id == current_user["id"],
+                )
+            )
+            if existing:
+                return None, (1009, "资源冲突", 409)
+
+            like = Like(user_id=current_user["id"], post_id=post_id)
+            db.add(like)
+            post.like_count = int(post.like_count or 0) + 1
+            post.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            return {"postId": post_id, "liked": True}, None
+    except IntegrityError:
         return None, (1009, "资源冲突", 409)
-
-    post["likeUserIds"].append(current_user["id"])
-    return {"postId": post_id, "liked": True}, None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
 
 
 def create_comment(current_user: Optional[dict], post_id: int, content: str, parent_id: Optional[int]):
     if not current_user:
         return None, (1002, "未登录或 Token 无效", 401)
 
-    post = find_post(post_id)
-    if not post:
-        return None, (1004, "资源不存在", 404)
+    try:
+        with SessionLocal() as db:
+            post = db.get(Post, post_id)
+            if not post:
+                return None, (1004, "资源不存在", 404)
 
-    if parent_id is not None and not any(
-        comment["commentId"] == parent_id for comment in STORE["comments"]
-    ):
-        return None, (1004, "父评论不存在", 404)
+            if parent_id is not None:
+                parent_comment = db.get(Comment, parent_id)
+                if not parent_comment or parent_comment.post_id != post_id:
+                    return None, (1004, "父评论不存在", 404)
 
-    comment = {
-        "commentId": STORE["next_comment_id"],
-        "postId": post_id,
-        "userId": current_user["id"],
-        "content": content,
-        "parentId": parent_id,
-        "createdAt": now_iso(),
-    }
-    STORE["next_comment_id"] += 1
-    STORE["comments"].append(comment)
-    post["commentCount"] += 1
-    post["updatedAt"] = now_iso()
-    return {"commentId": comment["commentId"]}, None
+            comment = Comment(
+                post_id=post_id,
+                user_id=current_user["id"],
+                content=content,
+                parent_id=parent_id,
+            )
+            db.add(comment)
+            post.comment_count = int(post.comment_count or 0) + 1
+            post.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(comment)
+            return {"commentId": comment.id}, None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
