@@ -115,6 +115,74 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(body["code"], 1002)
         self.assertIsNone(body["data"])
 
+    def test_birds_contract_shape_and_records_visibility(self):
+        token = self.login()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        recognize_response = self.client.post(
+            "/api/v1/birds/recognize",
+            headers=headers,
+            files={"image": ("contract-bird.png", io.BytesIO(b"fake-image"), "image/png")},
+        )
+        self.assertEqual(recognize_response.status_code, 201)
+        recognize_body = recognize_response.json()
+        self.assertEqual(recognize_body["code"], 0)
+        self.assertEqual(recognize_body["message"], "ok")
+        self.assertSetEqual(
+            set(recognize_body["data"].keys()),
+            {"recordId", "birdName", "confidence", "imageUrl", "createdAt"},
+        )
+        self.assertGreaterEqual(recognize_body["data"]["confidence"], 0)
+        self.assertLessEqual(recognize_body["data"]["confidence"], 1)
+        created_record_id = recognize_body["data"]["recordId"]
+
+        records_response = self.client.get(
+            "/api/v1/birds/records?page=1&pageSize=10",
+            headers=headers,
+        )
+        self.assertEqual(records_response.status_code, 200)
+        records_body = records_response.json()
+        self.assertEqual(records_body["code"], 0)
+        self.assertEqual(records_body["message"], "ok")
+        self.assertSetEqual(
+            set(records_body["data"].keys()),
+            {"list", "total", "page", "pageSize"},
+        )
+        self.assertEqual(records_body["data"]["page"], 1)
+        self.assertEqual(records_body["data"]["pageSize"], 10)
+        self.assertGreaterEqual(records_body["data"]["total"], 1)
+        self.assertTrue(
+            any(item["recordId"] == created_record_id for item in records_body["data"]["list"])
+        )
+
+    def test_birds_contract_unauthorized_and_invalid_file(self):
+        records_unauthorized = self.client.get("/api/v1/birds/records")
+        self.assertEqual(records_unauthorized.status_code, 401)
+        records_unauthorized_body = records_unauthorized.json()
+        self.assertEqual(records_unauthorized_body["code"], 1002)
+        self.assertIsNone(records_unauthorized_body["data"])
+
+        recognize_unauthorized = self.client.post(
+            "/api/v1/birds/recognize",
+            files={"image": ("no-token.jpg", io.BytesIO(b"fake-image"), "image/jpeg")},
+        )
+        self.assertEqual(recognize_unauthorized.status_code, 401)
+        recognize_unauthorized_body = recognize_unauthorized.json()
+        self.assertEqual(recognize_unauthorized_body["code"], 1002)
+        self.assertIsNone(recognize_unauthorized_body["data"])
+
+        token = self.login()
+        headers = {"Authorization": f"Bearer {token}"}
+        recognize_invalid_file = self.client.post(
+            "/api/v1/birds/recognize",
+            headers=headers,
+            files={"image": ("not-image.txt", io.BytesIO(b"fake-text"), "text/plain")},
+        )
+        self.assertEqual(recognize_invalid_file.status_code, 400)
+        recognize_invalid_file_body = recognize_invalid_file.json()
+        self.assertEqual(recognize_invalid_file_body["code"], 1006)
+        self.assertIsNone(recognize_invalid_file_body["data"])
+
     def test_user_and_records(self):
         token = self.login()
         headers = {"Authorization": f"Bearer {token}"}
