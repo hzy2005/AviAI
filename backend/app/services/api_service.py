@@ -1,20 +1,64 @@
 from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.core.auth import create_access_token, decode_access_token, hash_password, verify_password
+from app.db.session import SessionLocal
 from app.mock_data import STORE, paginate
+from app.models.bird_record import BirdRecord
+from app.models.user import User
 
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _dt_to_iso(value: Optional[datetime]) -> str:
+    if not value:
+        return now_iso()
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc).isoformat()
+    return value.astimezone(timezone.utc).isoformat()
+
+
+def _serialize_user_model(user: User) -> dict:
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "password_hash": user.password_hash,
+        "avatarUrl": user.avatar_url or "",
+        "createdAt": _dt_to_iso(user.created_at),
+    }
+
+
 def find_user_by_id(user_id: int):
-    return next((user for user in STORE["users"] if user["id"] == user_id), None)
+    # Keep compatibility for mock-backed posts data.
+    mock_user = next((user for user in STORE["users"] if user["id"] == user_id), None)
+    if mock_user:
+        return mock_user
+
+    try:
+        with SessionLocal() as db:
+            user = db.get(User, user_id)
+            if not user:
+                return None
+            return _serialize_user_model(user)
+    except SQLAlchemyError:
+        return None
 
 
 def find_user_by_email(email: str):
-    return next((user for user in STORE["users"] if user["email"] == email), None)
+    try:
+        with SessionLocal() as db:
+            user = db.scalar(select(User).where(User.email == email))
+            if not user:
+                return None
+            return _serialize_user_model(user)
+    except SQLAlchemyError:
+        return None
 
 
 def find_post(post_id: int):
@@ -25,7 +69,7 @@ def serialize_user_brief(user: dict):
     return {
         "id": user["id"],
         "username": user["username"],
-        "avatarUrl": user["avatarUrl"],
+        "avatarUrl": user.get("avatarUrl", "") or "",
     }
 
 
@@ -39,34 +83,41 @@ def resolve_user_from_token(token: Optional[str]):
 
 
 def register_user(username: str, email: str, password: str):
-    if find_user_by_email(email):
-        return None, (1009, "邮箱已注册", 409)
+    try:
+        with SessionLocal() as db:
+            if db.scalar(select(User).where(User.email == email)):
+                return None, (1009, "邮箱已注册", 409)
+            if db.scalar(select(User).where(User.username == username)):
+                return None, (1009, "用户名已存在", 409)
 
-    if any(user["username"] == username for user in STORE["users"]):
-        return None, (1009, "用户名已存在", 409)
-
-    user = {
-        "id": STORE["next_user_id"],
-        "username": username,
-        "email": email,
-        "password_hash": hash_password(password),
-        "avatarUrl": "",
-        "createdAt": now_iso(),
-    }
-    STORE["next_user_id"] += 1
-    STORE["users"].append(user)
-    return {"userId": user["id"]}, None
+            user = User(
+                username=username,
+                email=email,
+                password_hash=hash_password(password),
+                avatar_url="",
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            return {"userId": user.id}, None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
 
 
 def login_user(email: str, password: str):
-    user = find_user_by_email(email)
-    if not user or not verify_password(password, user["password_hash"]):
-        return None, (1002, "邮箱或密码错误", 401)
+    try:
+        with SessionLocal() as db:
+            user = db.scalar(select(User).where(User.email == email))
+            if not user or not verify_password(password, user.password_hash):
+                return None, (1002, "邮箱或密码错误", 401)
 
-    return {
-        "token": create_access_token(user["id"]),
-        "user": serialize_user_brief(user),
-    }, None
+            user_dict = _serialize_user_model(user)
+            return {
+                "token": create_access_token(user_dict["id"]),
+                "user": serialize_user_brief(user_dict),
+            }, None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
 
 
 def logout_user():
@@ -81,7 +132,7 @@ def get_user_profile(current_user: Optional[dict]):
         "id": current_user["id"],
         "username": current_user["username"],
         "email": current_user["email"],
-        "avatarUrl": current_user["avatarUrl"],
+        "avatarUrl": current_user.get("avatarUrl", "") or "",
         "createdAt": current_user["createdAt"],
     }, None
 
@@ -102,42 +153,65 @@ def recognize_bird_for_user(current_user: Optional[dict], filename: Optional[str
         bird_name = "翠鸟"
         confidence = 0.8911
 
-    record = {
-        "recordId": STORE["next_record_id"],
-        "userId": current_user["id"],
-        "birdName": bird_name,
-        "confidence": confidence,
-        "imageUrl": "/uploads/{0}".format(filename),
-        "createdAt": now_iso(),
-    }
-    STORE["next_record_id"] += 1
-    STORE["bird_records"].insert(0, record)
+    try:
+        with SessionLocal() as db:
+            record = BirdRecord(
+                user_id=current_user["id"],
+                bird_name=bird_name,
+                confidence=confidence,
+                image_url=f"/uploads/{filename}",
+            )
+            db.add(record)
+            db.commit()
+            db.refresh(record)
 
-    return {
-        "recordId": record["recordId"],
-        "birdName": record["birdName"],
-        "confidence": record["confidence"],
-        "imageUrl": record["imageUrl"],
-        "createdAt": record["createdAt"],
-    }, None
+            return {
+                "recordId": record.id,
+                "birdName": record.bird_name,
+                "confidence": float(record.confidence),
+                "imageUrl": record.image_url,
+                "createdAt": _dt_to_iso(record.created_at),
+            }, None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
 
 
 def list_bird_records(current_user: Optional[dict], page: int, page_size: int):
     if not current_user:
         return None, (1002, "未登录或 Token 无效", 401)
 
-    items = [
-        {
-            "recordId": record["recordId"],
-            "birdName": record["birdName"],
-            "confidence": record["confidence"],
-            "imageUrl": record["imageUrl"],
-            "createdAt": record["createdAt"],
-        }
-        for record in STORE["bird_records"]
-        if record["userId"] == current_user["id"]
-    ]
-    return paginate(items, page, page_size), None
+    try:
+        with SessionLocal() as db:
+            total = db.scalar(
+                select(func.count(BirdRecord.id)).where(
+                    BirdRecord.user_id == current_user["id"]
+                )
+            ) or 0
+            records = db.scalars(
+                select(BirdRecord)
+                .where(BirdRecord.user_id == current_user["id"])
+                .order_by(BirdRecord.created_at.desc(), BirdRecord.id.desc())
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            ).all()
+
+            return {
+                "list": [
+                    {
+                        "recordId": record.id,
+                        "birdName": record.bird_name,
+                        "confidence": float(record.confidence),
+                        "imageUrl": record.image_url,
+                        "createdAt": _dt_to_iso(record.created_at),
+                    }
+                    for record in records
+                ],
+                "total": int(total),
+                "page": page,
+                "pageSize": page_size,
+            }, None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
 
 
 def create_post(current_user: Optional[dict], content: str, image_url: Optional[str]):

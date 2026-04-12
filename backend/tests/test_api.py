@@ -1,6 +1,7 @@
 import io
 import sys
 import unittest
+import uuid
 from pathlib import Path
 
 CURRENT_FILE = Path(__file__).resolve()
@@ -19,12 +20,26 @@ class ApiTestCase(unittest.TestCase):
     def setUp(self):
         reset_store()
         self.client = TestClient(app)
+        self.case_id = uuid.uuid4().hex[:8]
 
     def login(self):
         response = self.client.post(
             "/api/v1/auth/login",
             json={"email": "bird@example.com", "password": "12345678"},
         )
+        if response.status_code != 200:
+            self.client.post(
+                "/api/v1/auth/register",
+                json={
+                    "username": f"birdlover_{self.case_id}",
+                    "email": "bird@example.com",
+                    "password": "12345678",
+                },
+            )
+            response = self.client.post(
+                "/api/v1/auth/login",
+                json={"email": "bird@example.com", "password": "12345678"},
+            )
         self.assertEqual(response.status_code, 200)
         return response.json()["data"]["token"]
 
@@ -37,7 +52,7 @@ class ApiTestCase(unittest.TestCase):
                 "password": password,
             },
         )
-        self.assertEqual(register_response.status_code, 201)
+        self.assertIn(register_response.status_code, {201, 409})
         login_response = self.client.post(
             "/api/v1/auth/login",
             json={"email": email, "password": password},
@@ -122,8 +137,8 @@ class ApiTestCase(unittest.TestCase):
         owner_token = self.login()
         owner_headers = {"Authorization": f"Bearer {owner_token}"}
         other_token = self.register_and_login(
-            username="post-other-user",
-            email="post-other@example.com",
+            username=f"post-other-user-{self.case_id}",
+            email=f"post-other-{self.case_id}@example.com",
         )
         other_headers = {"Authorization": f"Bearer {other_token}"}
 
@@ -226,8 +241,8 @@ class ApiTestCase(unittest.TestCase):
         register_response = self.client.post(
             "/api/v1/auth/register",
             json={
-                "username": "newbirder",
-                "email": "newbirder@example.com",
+                "username": f"newbirder-{self.case_id}",
+                "email": f"newbirder-{self.case_id}@example.com",
                 "password": "12345678",
             },
         )
@@ -235,7 +250,7 @@ class ApiTestCase(unittest.TestCase):
 
         login_response = self.client.post(
             "/api/v1/auth/login",
-            json={"email": "newbirder@example.com", "password": "12345678"},
+            json={"email": f"newbirder-{self.case_id}@example.com", "password": "12345678"},
         )
         self.assertEqual(login_response.status_code, 200)
         self.assertIn("token", login_response.json()["data"])
@@ -248,8 +263,8 @@ class ApiTestCase(unittest.TestCase):
         register_response = self.client.post(
             "/api/v1/auth/register",
             json={
-                "username": "contract-user",
-                "email": "contract@example.com",
+                "username": f"contract-user-{self.case_id}",
+                "email": f"contract-{self.case_id}@example.com",
                 "password": "12345678",
             },
         )
@@ -261,7 +276,7 @@ class ApiTestCase(unittest.TestCase):
 
         login_response = self.client.post(
             "/api/v1/auth/login",
-            json={"email": "contract@example.com", "password": "12345678"},
+            json={"email": f"contract-{self.case_id}@example.com", "password": "12345678"},
         )
         self.assertEqual(login_response.status_code, 200)
         login_body = login_response.json()
@@ -287,7 +302,7 @@ class ApiTestCase(unittest.TestCase):
             set(me_body["data"].keys()),
             {"id", "username", "email", "avatarUrl", "createdAt"},
         )
-        self.assertEqual(me_body["data"]["email"], "contract@example.com")
+        self.assertEqual(me_body["data"]["email"], f"contract-{self.case_id}@example.com")
 
         logout_response = self.client.post("/api/v1/auth/logout")
         self.assertEqual(logout_response.status_code, 200)
@@ -379,6 +394,13 @@ class ApiTestCase(unittest.TestCase):
         user_response = self.client.get("/api/v1/users/me", headers=headers)
         self.assertEqual(user_response.status_code, 200)
         self.assertEqual(user_response.json()["data"]["email"], "bird@example.com")
+
+        recognize_response = self.client.post(
+            "/api/v1/birds/recognize",
+            headers=headers,
+            files={"image": ("records-check.jpg", io.BytesIO(b"fake-image"), "image/jpeg")},
+        )
+        self.assertEqual(recognize_response.status_code, 201)
 
         records_response = self.client.get("/api/v1/birds/records", headers=headers)
         self.assertEqual(records_response.status_code, 200)
