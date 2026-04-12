@@ -1,5 +1,13 @@
 import io
+import sys
 import unittest
+from pathlib import Path
+
+CURRENT_FILE = Path(__file__).resolve()
+BACKEND_ROOT = CURRENT_FILE.parents[1]
+
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from fastapi.testclient import TestClient
 
