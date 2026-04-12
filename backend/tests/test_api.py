@@ -55,6 +55,66 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(logout_response.status_code, 200)
         self.assertTrue(logout_response.json()["data"]["success"])
 
+    def test_auth_contract_shape(self):
+        register_response = self.client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "contract-user",
+                "email": "contract@example.com",
+                "password": "12345678",
+            },
+        )
+        self.assertEqual(register_response.status_code, 201)
+        register_body = register_response.json()
+        self.assertEqual(register_body["code"], 0)
+        self.assertEqual(register_body["message"], "ok")
+        self.assertIn("userId", register_body["data"])
+
+        login_response = self.client.post(
+            "/api/v1/auth/login",
+            json={"email": "contract@example.com", "password": "12345678"},
+        )
+        self.assertEqual(login_response.status_code, 200)
+        login_body = login_response.json()
+        self.assertEqual(login_body["code"], 0)
+        self.assertEqual(login_body["message"], "ok")
+        self.assertIn("token", login_body["data"])
+        self.assertIn("user", login_body["data"])
+        self.assertSetEqual(
+            set(login_body["data"]["user"].keys()),
+            {"id", "username", "avatarUrl"},
+        )
+
+        token = login_body["data"]["token"]
+        me_response = self.client.get(
+            "/api/v1/users/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(me_response.status_code, 200)
+        me_body = me_response.json()
+        self.assertEqual(me_body["code"], 0)
+        self.assertEqual(me_body["message"], "ok")
+        self.assertSetEqual(
+            set(me_body["data"].keys()),
+            {"id", "username", "email", "avatarUrl", "createdAt"},
+        )
+        self.assertEqual(me_body["data"]["email"], "contract@example.com")
+
+        logout_response = self.client.post("/api/v1/auth/logout")
+        self.assertEqual(logout_response.status_code, 200)
+        logout_body = logout_response.json()
+        self.assertEqual(logout_body["code"], 0)
+        self.assertEqual(logout_body["message"], "ok")
+        self.assertSetEqual(set(logout_body["data"].keys()), {"success"})
+        self.assertTrue(logout_body["data"]["success"])
+
+    def test_auth_contract_users_me_unauthorized(self):
+        response = self.client.get("/api/v1/users/me")
+        self.assertEqual(response.status_code, 401)
+        body = response.json()
+        self.assertEqual(body["code"], 1002)
+        self.assertIsNone(body["data"])
+
     def test_user_and_records(self):
         token = self.login()
         headers = {"Authorization": f"Bearer {token}"}
