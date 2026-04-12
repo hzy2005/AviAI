@@ -228,7 +228,7 @@ paths:
                       imageUrl: /uploads/20260309_xxx.jpg
                       createdAt: "2026-03-09T10:35:00Z"
         "400":
-          $ref: "#/components/responses/BadRequest"
+          $ref: "#/components/responses/InvalidUpload"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -402,6 +402,8 @@ paths:
                 $ref: "#/components/schemas/CreatePostResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
     delete:
@@ -423,6 +425,8 @@ paths:
                 $ref: "#/components/schemas/DeletePostResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -582,6 +586,16 @@ components:
             code: 1002
             message: 未登录或 Token 无效
             data: null
+    Forbidden:
+      description: 无权限访问该资源
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: 1003
+            message: 无权限
+            data: null
     NotFound:
       description: 目标资源不存在
       content:
@@ -591,6 +605,16 @@ components:
           example:
             code: 1004
             message: 资源不存在
+            data: null
+    InvalidUpload:
+      description: 上传文件不合法
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: 1006
+            message: 上传文件不合法
             data: null
     Conflict:
       description: 资源冲突（如重复注册、重复点赞）
@@ -1023,7 +1047,7 @@ components:
     PostItem:
       type: object
       description: 动态列表项。
-      required: [postId, content, likeCount, commentCount, createdAt, author]
+      required: [postId, content, likeCount, commentCount, createdAt, updatedAt, author]
       properties:
         postId:
           type: integer
