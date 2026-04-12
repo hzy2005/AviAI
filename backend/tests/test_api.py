@@ -28,6 +28,79 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return response.json()["data"]["token"]
 
+    def assert_post_contract_shape(self, post_data):
+        self.assertSetEqual(
+            set(post_data.keys()),
+            {
+                "postId",
+                "content",
+                "imageUrl",
+                "likeCount",
+                "commentCount",
+                "createdAt",
+                "updatedAt",
+                "author",
+            },
+        )
+        self.assertIsInstance(post_data["postId"], int)
+        self.assertIsInstance(post_data["content"], str)
+        self.assertIn(type(post_data["imageUrl"]), {str, type(None)})
+        self.assertIsInstance(post_data["likeCount"], int)
+        self.assertIsInstance(post_data["commentCount"], int)
+        self.assertIsInstance(post_data["createdAt"], str)
+        self.assertIsInstance(post_data["updatedAt"], str)
+        self.assertSetEqual(
+            set(post_data["author"].keys()),
+            {"id", "username", "avatarUrl"},
+        )
+
+    def test_posts_contract_list_and_detail_shape(self):
+        token = self.login()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        create_post_response = self.client.post(
+            "/api/v1/posts",
+            headers=headers,
+            json={
+                "content": "contract post content",
+                "imageUrl": "/uploads/contract-post.jpg",
+            },
+        )
+        self.assertEqual(create_post_response.status_code, 201)
+        created_post_id = create_post_response.json()["data"]["postId"]
+
+        list_response = self.client.get("/api/v1/posts?page=1&pageSize=10&keyword=contract")
+        self.assertEqual(list_response.status_code, 200)
+        list_body = list_response.json()
+        self.assertEqual(list_body["code"], 0)
+        self.assertEqual(list_body["message"], "ok")
+        self.assertSetEqual(
+            set(list_body["data"].keys()),
+            {"list", "total", "page", "pageSize"},
+        )
+        self.assertEqual(list_body["data"]["page"], 1)
+        self.assertEqual(list_body["data"]["pageSize"], 10)
+        self.assertGreaterEqual(list_body["data"]["total"], 1)
+
+        matched_item = next(
+            (
+                item
+                for item in list_body["data"]["list"]
+                if item["postId"] == created_post_id
+            ),
+            None,
+        )
+        self.assertIsNotNone(matched_item)
+        self.assert_post_contract_shape(matched_item)
+
+        detail_response = self.client.get(f"/api/v1/posts/{created_post_id}")
+        self.assertEqual(detail_response.status_code, 200)
+        detail_body = detail_response.json()
+        self.assertEqual(detail_body["code"], 0)
+        self.assertEqual(detail_body["message"], "ok")
+        self.assert_post_contract_shape(detail_body["data"])
+        self.assertEqual(detail_body["data"]["postId"], created_post_id)
+
     def test_health(self):
         response = self.client.get("/api/v1/health")
         self.assertEqual(response.status_code, 200)
