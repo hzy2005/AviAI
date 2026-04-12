@@ -86,6 +86,121 @@ class ApiTestCase(unittest.TestCase):
             {"id", "username", "avatarUrl"},
         )
 
+    def test_e2e_frontend_login_recognize_records_flow(self):
+        email = f"e2e-birds-{self.case_id}@example.com"
+        username = f"e2e-birds-{self.case_id}"
+        password = "12345678"
+
+        register_response = self.client.post(
+            "/api/v1/auth/register",
+            json={"username": username, "email": email, "password": password},
+        )
+        self.assertEqual(register_response.status_code, 201)
+
+        login_response = self.client.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": password},
+        )
+        self.assertEqual(login_response.status_code, 200)
+        login_data = login_response.json()["data"]
+        token = login_data["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        me_response = self.client.get("/api/v1/users/me", headers=headers)
+        self.assertEqual(me_response.status_code, 200)
+        self.assertEqual(me_response.json()["data"]["email"], email)
+
+        recognize_response = self.client.post(
+            "/api/v1/birds/recognize",
+            headers=headers,
+            files={"image": ("e2e-bird.jpg", io.BytesIO(b"fake-image"), "image/jpeg")},
+        )
+        self.assertEqual(recognize_response.status_code, 201)
+        recognize_data = recognize_response.json()["data"]
+        created_record_id = recognize_data["recordId"]
+
+        records_response = self.client.get(
+            "/api/v1/birds/records?page=1&pageSize=10",
+            headers=headers,
+        )
+        self.assertEqual(records_response.status_code, 200)
+        records_data = records_response.json()["data"]
+        self.assertGreaterEqual(records_data["total"], 1)
+        self.assertTrue(
+            any(item["recordId"] == created_record_id for item in records_data["list"])
+        )
+
+    def test_e2e_frontend_community_crud_like_comment_flow(self):
+        owner_email = f"e2e-owner-{self.case_id}@example.com"
+        actor_email = f"e2e-actor-{self.case_id}@example.com"
+        owner_token = self.register_and_login(
+            username=f"e2e-owner-{self.case_id}",
+            email=owner_email,
+        )
+        actor_token = self.register_and_login(
+            username=f"e2e-actor-{self.case_id}",
+            email=actor_email,
+        )
+        owner_headers = {"Authorization": f"Bearer {owner_token}"}
+        actor_headers = {"Authorization": f"Bearer {actor_token}"}
+
+        create_response = self.client.post(
+            "/api/v1/posts",
+            headers=owner_headers,
+            json={"content": "e2e community post", "imageUrl": "/uploads/e2e-post.jpg"},
+        )
+        self.assertEqual(create_response.status_code, 201)
+        post_id = create_response.json()["data"]["postId"]
+
+        list_response = self.client.get("/api/v1/posts?page=1&pageSize=10&keyword=e2e")
+        self.assertEqual(list_response.status_code, 200)
+        list_item = next(
+            (item for item in list_response.json()["data"]["list"] if item["postId"] == post_id),
+            None,
+        )
+        self.assertIsNotNone(list_item)
+        self.assert_post_contract_shape(list_item)
+
+        detail_response = self.client.get(f"/api/v1/posts/{post_id}")
+        self.assertEqual(detail_response.status_code, 200)
+        self.assert_post_contract_shape(detail_response.json()["data"])
+
+        update_response = self.client.put(
+            f"/api/v1/posts/{post_id}",
+            headers=owner_headers,
+            json={"content": "e2e community post updated", "imageUrl": "/uploads/e2e-post-2.jpg"},
+        )
+        self.assertEqual(update_response.status_code, 200)
+
+        like_response = self.client.post(
+            f"/api/v1/posts/{post_id}/like",
+            headers=actor_headers,
+        )
+        self.assertEqual(like_response.status_code, 200)
+        self.assertTrue(like_response.json()["data"]["liked"])
+
+        comment_response = self.client.post(
+            f"/api/v1/posts/{post_id}/comments",
+            headers=actor_headers,
+            json={"content": "e2e comment", "parentId": None},
+        )
+        self.assertEqual(comment_response.status_code, 201)
+        self.assertIn("commentId", comment_response.json()["data"])
+
+        detail_after_interaction = self.client.get(f"/api/v1/posts/{post_id}")
+        self.assertEqual(detail_after_interaction.status_code, 200)
+        detail_after_data = detail_after_interaction.json()["data"]
+        self.assertEqual(detail_after_data["likeCount"], 1)
+        self.assertEqual(detail_after_data["commentCount"], 1)
+
+        delete_response = self.client.delete(f"/api/v1/posts/{post_id}", headers=owner_headers)
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertTrue(delete_response.json()["data"]["deleted"])
+
+        detail_deleted = self.client.get(f"/api/v1/posts/{post_id}")
+        self.assertEqual(detail_deleted.status_code, 404)
+        self.assertEqual(detail_deleted.json()["code"], 1004)
+
     def test_posts_contract_list_and_detail_shape(self):
         token = self.login()
         headers = {"Authorization": f"Bearer {token}"}
