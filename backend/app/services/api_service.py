@@ -233,8 +233,10 @@ def like_post(current_user: Optional[dict], post_id: int):
     if not post:
         return None, (1004, "资源不存在", 404)
 
-    if current_user["id"] not in post["likeUserIds"]:
-        post["likeUserIds"].append(current_user["id"])
+    if current_user["id"] in post["likeUserIds"]:
+        return None, (1009, "资源冲突", 409)
+
+    post["likeUserIds"].append(current_user["id"])
     return {"postId": post_id, "liked": True}, None
 
 

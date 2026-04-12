@@ -28,6 +28,23 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return response.json()["data"]["token"]
 
+    def register_and_login(self, username, email, password="12345678"):
+        register_response = self.client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": username,
+                "email": email,
+                "password": password,
+            },
+        )
+        self.assertEqual(register_response.status_code, 201)
+        login_response = self.client.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": password},
+        )
+        self.assertEqual(login_response.status_code, 200)
+        return login_response.json()["data"]["token"]
+
     def assert_post_contract_shape(self, post_data):
         self.assertSetEqual(
             set(post_data.keys()),
@@ -100,6 +117,105 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(detail_body["message"], "ok")
         self.assert_post_contract_shape(detail_body["data"])
         self.assertEqual(detail_body["data"]["postId"], created_post_id)
+
+    def test_posts_write_contract_error_codes(self):
+        owner_token = self.login()
+        owner_headers = {"Authorization": f"Bearer {owner_token}"}
+        other_token = self.register_and_login(
+            username="post-other-user",
+            email="post-other@example.com",
+        )
+        other_headers = {"Authorization": f"Bearer {other_token}"}
+
+        create_unauthorized = self.client.post(
+            "/api/v1/posts",
+            json={"content": "unauthorized create", "imageUrl": None},
+        )
+        self.assertEqual(create_unauthorized.status_code, 401)
+        self.assertEqual(create_unauthorized.json()["code"], 1002)
+
+        created = self.client.post(
+            "/api/v1/posts",
+            headers=owner_headers,
+            json={"content": "post write contract", "imageUrl": "/uploads/pc.jpg"},
+        )
+        self.assertEqual(created.status_code, 201)
+        created_post_id = created.json()["data"]["postId"]
+
+        update_unauthorized = self.client.put(
+            f"/api/v1/posts/{created_post_id}",
+            json={"content": "update without auth", "imageUrl": None},
+        )
+        self.assertEqual(update_unauthorized.status_code, 401)
+        self.assertEqual(update_unauthorized.json()["code"], 1002)
+
+        update_not_found = self.client.put(
+            "/api/v1/posts/999999",
+            headers=owner_headers,
+            json={"content": "missing post", "imageUrl": None},
+        )
+        self.assertEqual(update_not_found.status_code, 404)
+        self.assertEqual(update_not_found.json()["code"], 1004)
+
+        update_forbidden = self.client.put(
+            f"/api/v1/posts/{created_post_id}",
+            headers=other_headers,
+            json={"content": "forbidden update", "imageUrl": None},
+        )
+        self.assertEqual(update_forbidden.status_code, 403)
+        self.assertEqual(update_forbidden.json()["code"], 1003)
+
+        delete_unauthorized = self.client.delete(f"/api/v1/posts/{created_post_id}")
+        self.assertEqual(delete_unauthorized.status_code, 401)
+        self.assertEqual(delete_unauthorized.json()["code"], 1002)
+
+        delete_not_found = self.client.delete("/api/v1/posts/999998", headers=owner_headers)
+        self.assertEqual(delete_not_found.status_code, 404)
+        self.assertEqual(delete_not_found.json()["code"], 1004)
+
+        delete_forbidden = self.client.delete(
+            f"/api/v1/posts/{created_post_id}",
+            headers=other_headers,
+        )
+        self.assertEqual(delete_forbidden.status_code, 403)
+        self.assertEqual(delete_forbidden.json()["code"], 1003)
+
+        like_unauthorized = self.client.post(f"/api/v1/posts/{created_post_id}/like")
+        self.assertEqual(like_unauthorized.status_code, 401)
+        self.assertEqual(like_unauthorized.json()["code"], 1002)
+
+        like_not_found = self.client.post("/api/v1/posts/999997/like", headers=owner_headers)
+        self.assertEqual(like_not_found.status_code, 404)
+        self.assertEqual(like_not_found.json()["code"], 1004)
+
+        like_success = self.client.post(
+            f"/api/v1/posts/{created_post_id}/like",
+            headers=owner_headers,
+        )
+        self.assertEqual(like_success.status_code, 200)
+        self.assertEqual(like_success.json()["code"], 0)
+
+        like_conflict = self.client.post(
+            f"/api/v1/posts/{created_post_id}/like",
+            headers=owner_headers,
+        )
+        self.assertEqual(like_conflict.status_code, 409)
+        self.assertEqual(like_conflict.json()["code"], 1009)
+
+        comment_unauthorized = self.client.post(
+            f"/api/v1/posts/{created_post_id}/comments",
+            json={"content": "unauthorized comment", "parentId": None},
+        )
+        self.assertEqual(comment_unauthorized.status_code, 401)
+        self.assertEqual(comment_unauthorized.json()["code"], 1002)
+
+        comment_not_found = self.client.post(
+            "/api/v1/posts/999996/comments",
+            headers=owner_headers,
+            json={"content": "missing post comment", "parentId": None},
+        )
+        self.assertEqual(comment_not_found.status_code, 404)
+        self.assertEqual(comment_not_found.json()["code"], 1004)
 
     def test_health(self):
         response = self.client.get("/api/v1/health")
