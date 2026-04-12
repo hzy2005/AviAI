@@ -1,0 +1,81 @@
+<view class="auth-page">
+  <view class="hero">
+    <view class="title-block">
+      <text class="title-line">Hello!</text>
+      <text class="title-line">Sign up to</text>
+      <text class="title-line">get started</text>
+    </view>
+
+    <view class="hero-bird-wrap">
+      <image class="hero-bird" src="/static/view/login and register.png" mode="aspectFill" />
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="field-wrap">
+      <input class="field" placeholder="Full Name" placeholder-class="field-placeholder" value="{{fullName}}" data-key="fullName" bindinput="onInput" />
+      <image class="field-icon" src="/static/icons/icon-user.png" />
+    </view>
+
+    <view class="field-wrap">
+      <input
+        class="field"
+        placeholder="Mobile Number"
+        placeholder-class="field-placeholder"
+        type="number"
+        value="{{mobile}}"
+        data-key="mobile"
+        bindinput="onInput"
+      />
+      <image class="field-icon" src="/static/icons/icon-phone.png" />
+    </view>
+
+    <view class="field-wrap">
+      <input class="field" type="text" placeholder="Email" placeholder-class="field-placeholder" value="{{email}}" data-key="email" bindinput="onInput" />
+      <image class="field-icon" src="/static/icons/icon-user.png" />
+    </view>
+
+    <view class="field-wrap">
+      <input
+        class="field"
+        password="{{!showPassword}}"
+        placeholder="Password"
+        placeholder-class="field-placeholder"
+        value="{{password}}"
+        data-key="password"
+        bindinput="onInput"
+      />
+      <image
+        class="field-icon"
+        src="{{showPassword ? '/static/icons/eye-open.png' : '/static/icons/eye-close.png'}}"
+        bindtap="togglePassword"
+      />
+    </view>
+
+    <view class="field-wrap">
+      <input
+        class="field"
+        password="true"
+        placeholder="Confirm Password"
+        placeholder-class="field-placeholder"
+        value="{{confirmPassword}}"
+        data-key="confirmPassword"
+        bindinput="onInput"
+      />
+    </view>
+
+    <view class="btn-wrap">
+      <button class="primary-btn" loading="{{loading}}" bindtap="onSignUp">Sign Up</button>
+    </view>
+
+    <view class="switch-row">
+      <text class="switch-tip">Already have an account?</text>
+      <text class="switch-link" bindtap="onGoSignIn">Sign In</text>
+    </view>
+  </view>
+
+  <view class="wave-wrap">
+    <image class="wave-svg wave-back" src="/static/view/wave-dark1.svg" mode="widthFix" />
+    <image class="wave-svg wave-front" src="/static/view/wave-light1.svg" mode="widthFix" />
+  </view>
+</view>

@@ -17,7 +17,7 @@
 
 ## 技术栈（初步规划）
 
-* 前端：Vue / HTML / CSS / JavaScript
+* 前端：微信小程序原始框架
 * 后端：Node.js / Express
 * 数据库：MySQL
 * AI模型：TensorFlow / PyTorch（用于鸟类图像识别）

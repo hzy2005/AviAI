@@ -1,13 +1,56 @@
 {
   "pages": [
-    "pages/index/index"
+    "pages/splash/splash",
+    "pages/login/login",
+    "pages/register/register",
+    "pages/index/index",
+    "pages/community/community",
+    "pages/encyclopedia/encyclopedia",
+    "pages/profile/profile",
+    "pages/recognize/recognize",
+    "pages/history/history",
+    "pages/community-detail/community-detail",
+    "pages/bird-detail/bird-detail",
+    "pages/profile-edit/profile-edit"
   ],
   "window": {
     "navigationBarTitleText": "AviAI",
-    "navigationBarBackgroundColor": "#1d9c5a",
+    "navigationBarBackgroundColor": "#297C57",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#f5f7fb",
     "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#8A8EB1",
+    "selectedColor": "#4285F6",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "",
+        "iconPath": "static/icons/Home.png",
+        "selectedIconPath": "static/icons/Home-active.png"
+      },
+      {
+        "pagePath": "pages/community/community",
+        "text": "",
+        "iconPath": "static/icons/Community.png",
+        "selectedIconPath": "static/icons/Community-active.png"
+      },
+      {
+        "pagePath": "pages/encyclopedia/encyclopedia",
+        "text": "",
+        "iconPath": "static/icons/Encyclopedia.png",
+        "selectedIconPath": "static/icons/Encyclopedia-active.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "",
+        "iconPath": "static/icons/user.png",
+        "selectedIconPath": "static/icons/user-active.png"
+      }
+    ]
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json"
