@@ -1,0 +1,53 @@
+<view class="page">
+  <view wx:if="{{hasToken && profile}}" class="profile-wrap">
+    <view class="hero" bindtap="onChangeCover">
+      <image class="hero-bg" src="{{coverImage}}" mode="aspectFill" />
+      <view class="hero-mask"></view>
+    </view>
+
+    <view class="avatar-wrap">
+      <image class="avatar" src="{{avatarUrl}}" mode="aspectFill" />
+    </view>
+
+    <view class="name">{{profile.username || 'User'}}</view>
+    <view class="email">{{profile.email || '-'}}</view>
+
+    <view class="actions">
+      <button class="action-btn" bindtap="onGoEdit">Settings</button>
+      <button class="action-btn logout-btn" bindtap="onLogout">Logout</button>
+    </view>
+
+    <view class="records-title">My Recordings</view>
+
+    <view wx:if="{{leftFeed.length || rightFeed.length}}" class="masonry">
+      <view class="column">
+        <view wx:for="{{leftFeed}}" wx:key="recordId" class="post-card {{item.sizeClass}}" bindtap="onOpenRecord" data-id="{{item.recordId}}">
+          <image wx:if="{{item.fullImageUrl}}" class="post-image" src="{{item.fullImageUrl}}" mode="aspectFill" data-src="{{item.fullImageUrl}}" catchtap="onPreviewImage" />
+          <view wx:else class="post-image placeholder"></view>
+          <view class="overlay"></view>
+          <view class="card-meta">
+            <text class="views">{{item.createdAtText}}</text>
+            <text class="name-text">{{item.displayTitle}}</text>
+            <text class="views">Confidence {{item.confidenceText}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="column">
+        <view wx:for="{{rightFeed}}" wx:key="recordId" class="post-card {{item.sizeClass}}" bindtap="onOpenRecord" data-id="{{item.recordId}}">
+          <image wx:if="{{item.fullImageUrl}}" class="post-image" src="{{item.fullImageUrl}}" mode="aspectFill" data-src="{{item.fullImageUrl}}" catchtap="onPreviewImage" />
+          <view wx:else class="post-image placeholder"></view>
+          <view class="overlay"></view>
+          <view class="card-meta">
+            <text class="views">{{item.createdAtText}}</text>
+            <text class="name-text">{{item.displayTitle}}</text>
+            <text class="views">Confidence {{item.confidenceText}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{!loadingRecords && !records.length}}" class="empty">No recordings yet.</view>
+    <view wx:if="{{loadingRecords}}" class="empty">Loading...</view>
+  </view>
+</view>

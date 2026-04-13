@@ -1,0 +1,50 @@
+<view class="page">
+  <view class="top-bar" style="padding-top: {{statusBarHeight}}px;">
+    <view class="nav-inner">
+      <view class="back-btn" bindtap="onBack">
+        <image class="back-icon" src="/static/icons/return.png" mode="aspectFit" />
+      </view>
+    </view>
+  </view>
+
+  <view class="content">
+    <view class="avatar-wrap" bindtap="onChooseAvatar">
+      <image class="avatar" src="{{form.avatarUrl}}" mode="aspectFill" />
+    </view>
+
+    <view class="field-wrap">
+      <input class="field" type="text" value="{{form.username}}" placeholder="@naufalaziz" placeholder-class="field-placeholder" data-key="username" bindinput="onInput" />
+      <image class="field-icon" src="/static/icons/icon-user.png" />
+    </view>
+
+    <view class="field-wrap">
+      <input class="field" type="number" value="{{form.phone}}" placeholder="08123456789" placeholder-class="field-placeholder" data-key="phone" bindinput="onInput" />
+      <image class="field-icon" src="/static/icons/icon-phone.png" />
+    </view>
+
+    <view class="field-wrap">
+      <input class="field" type="text" value="{{form.email}}" placeholder="naufalaziz@email.com" placeholder-class="field-placeholder" data-key="email" bindinput="onInput" />
+      <image class="field-icon" src="/static/icons/icon-user.png" />
+    </view>
+
+    <view class="field-wrap">
+      <input class="field" password="{{!showPassword}}" value="{{form.password}}" placeholder="Password" placeholder-class="field-placeholder" data-key="password" bindinput="onInput" />
+      <image
+        class="field-icon"
+        src="{{showPassword ? '/static/icons/eye-open.png' : '/static/icons/eye-close.png'}}"
+        bindtap="togglePassword"
+      />
+    </view>
+
+    <view class="field-wrap">
+      <input class="field" password="{{!showPassword}}" value="{{form.confirmPassword}}" placeholder="Confirm Password" placeholder-class="field-placeholder" data-key="confirmPassword" bindinput="onInput" />
+    </view>
+
+    <view class="btn-wrap">
+      <button class="primary-btn" loading="{{loading}}" bindtap="onDone">Done</button>
+    </view>
+    <view class="btn-wrap secondary-wrap">
+      <button class="secondary-btn" bindtap="onCancel">Cancel</button>
+    </view>
+  </view>
+</view>

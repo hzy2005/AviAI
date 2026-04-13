@@ -1,0 +1,16 @@
+<view class="page">
+  <view wx:if="{{result}}" class="card">
+    <image wx:if="{{result.localTempPath}}" class="hero" src="{{result.localTempPath}}" mode="aspectFill" bindtap="onPreviewImage" />
+    <image wx:elif="{{result.fullImageUrl}}" class="hero" src="{{result.fullImageUrl}}" mode="aspectFill" bindtap="onPreviewImage" />
+    <view wx:else class="hero placeholder"></view>
+
+    <view class="name">{{result.birdName}}</view>
+    <view class="score">置信度 {{result.confidenceText}}</view>
+    <view class="time">识别时间：{{result.createdAtText}}</view>
+    <view class="record">记录 ID：{{result.recordId || '-'}}</view>
+
+    <button class="post-btn" loading="{{loadingPost}}" bindtap="onPostToCommunity">This is my bird!</button>
+  </view>
+
+  <view wx:else class="empty">暂无识别结果，请先在首页进行识别。</view>
+</view>

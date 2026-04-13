@@ -1,0 +1,136 @@
+.splash-page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(180deg, #f4eceb 0%, #e8dddc 100%);
+}
+
+/* 背景图 */
+.bg-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: scale(1.03);
+}
+
+/* 两个柔光层，让画面更有氛围 */
+.bg-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(50rpx);
+  opacity: 0.9;
+}
+
+.bg-glow-1 {
+  width: 280rpx;
+  height: 280rpx;
+  top: 140rpx;
+  left: -40rpx;
+  background: rgba(255, 255, 255, 0.20);
+}
+
+.bg-glow-2 {
+  width: 240rpx;
+  height: 240rpx;
+  top: 240rpx;
+  right: -30rpx;
+  background: rgba(255, 214, 220, 0.22);
+}
+
+/* 品牌标题 */
+.brand-row {
+  position: absolute;
+  z-index: 3;
+  top: 170rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8rpx;
+  white-space: nowrap;
+}
+
+.brand-main {
+  font-size: 94rpx;
+  font-weight: 800;
+  line-height: 1;
+  color: #111111;
+  letter-spacing: -2rpx;
+  text-shadow: 0 6rpx 18rpx rgba(255, 255, 255, 0.18);
+}
+
+.brand-sub {
+  font-size: 94rpx;
+  font-weight: 800;
+  line-height: 1;
+  color: #ffffff;
+  letter-spacing: -2rpx;
+  text-shadow: 0 8rpx 22rpx rgba(0, 0, 0, 0.10);
+}
+
+/* 副标题 */
+.tagline {
+  position: absolute;
+  z-index: 3;
+  top: 290rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 560rpx;
+  text-align: center;
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 1rpx;
+  text-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.10);
+}
+
+/* 底部按钮区 */
+.bottom-action {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 110rpx;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 高级按钮 */
+.explore-btn {
+  width: 400rpx;
+  height: 92rpx;
+  border: none;
+  border-radius: 999rpx;
+  padding: 0;
+  margin: 0;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  background: linear-gradient(135deg, #111111 0%, #2b2b2b 100%);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 700;
+  letter-spacing: 1rpx;
+
+  box-shadow:
+    0 14rpx 36rpx rgba(0, 0, 0, 0.20),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.10);
+
+  transition: all 0.2s ease;
+}
+
+/* 去掉微信 button 默认边框 */
+.explore-btn::after {
+  border: none;
+}
+
+/* 点击反馈 */
+.explore-btn-hover {
+  transform: scale(0.97);
+  opacity: 0.92;
+}

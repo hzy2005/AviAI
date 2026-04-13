@@ -1,0 +1,18 @@
+<view class="page">
+  <view wx:if="{{list.length}}" class="list">
+    <view wx:for="{{list}}" wx:key="recordId" class="item" data-index="{{index}}" bindtap="onOpenResult">
+      <image wx:if="{{item.fullImageUrl}}" class="img" src="{{item.fullImageUrl}}" mode="aspectFill" />
+      <view wx:else class="img placeholder"></view>
+
+      <view class="main">
+        <view class="name">{{item.birdName}}</view>
+        <view class="line">置信度 {{item.confidenceText}}</view>
+        <view class="line">{{item.createdAtText}}</view>
+      </view>
+      <view class="go">›</view>
+    </view>
+  </view>
+
+  <view wx:else class="empty">暂无识别历史</view>
+  <view wx:if="{{noMore && list.length}}" class="no-more">已加载全部记录</view>
+</view>

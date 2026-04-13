@@ -1,0 +1,32 @@
+<view class="page">
+  <view class="nav" style="padding-top: {{statusBarHeight}}px;">
+    <view class="nav-inner">
+      <view class="nav-btn" bindtap="onBack">
+        <image class="nav-icon-image" src="{{iconBack}}" mode="aspectFit" />
+      </view>
+      <view class="nav-btn" wx:if="{{showShareButton}}" bindtap="onTapShare">
+        <image class="nav-icon-image" src="{{iconShare}}" mode="aspectFit" />
+      </view>
+      <view class="nav-btn nav-placeholder" wx:else></view>
+    </view>
+  </view>
+
+  <view class="hero-wrap">
+    <swiper wx:if="{{imageList.length}}" class="hero-swiper" indicator-dots="{{imageList.length > 1}}" indicator-color="rgba(255,255,255,0.45)" indicator-active-color="#ffffff" circular="{{imageList.length > 1}}">
+      <swiper-item wx:for="{{imageList}}" wx:key="*this">
+        <image class="hero-image" src="{{item}}" mode="aspectFill" data-src="{{item}}" bindtap="onPreviewImage" />
+      </swiper-item>
+    </swiper>
+    <view wx:else class="hero-empty"></view>
+  </view>
+
+  <view class="title">{{title}}</view>
+  <view wx:if="{{subtitle}}" class="subtitle">{{subtitle}}</view>
+
+  <view class="info-list">
+    <view wx:for="{{infoRows}}" wx:key="label" class="info-row">
+      <view class="label">{{item.label}}</view>
+      <view class="value">{{item.value}}</view>
+    </view>
+  </view>
+</view>

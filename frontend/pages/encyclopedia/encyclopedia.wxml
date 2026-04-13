@@ -1,0 +1,57 @@
+<view class="page">
+  <view class="search-row">
+    <view class="search-wrap">
+      <image class="search-icon" src="/static/icons/search.png" mode="aspectFit" />
+      <input class="search" placeholder="Rechercher" value="{{keyword}}" bindinput="onKeywordInput" />
+    </view>
+  </view>
+
+  <view class="tab-row">
+    <view class="tab {{activeTab === 'kind' ? 'active' : ''}}" data-tab="kind" bindtap="onSwitchTab">
+      <text>Bird Kind</text>
+    </view>
+    <view class="tab {{activeTab === 'records' ? 'active' : ''}}" data-tab="records" bindtap="onSwitchTab">
+      <text>My recordings</text>
+    </view>
+  </view>
+
+  <view wx:if="{{activeTab === 'kind'}}" class="list">
+    <view wx:for="{{filteredKindList}}" wx:key="id" class="item" data-id="{{item.id}}" bindtap="onOpenBird">
+      <image class="thumb" src="{{item.thumbUrl || defaultThumb}}" mode="aspectFill" />
+      <view class="main">
+        <view class="sn">{{item.scientificName}}</view>
+        <view class="en">{{item.commonName}}</view>
+      </view>
+      <view class="info-wrap">
+        <text class="info-icon">i</text>
+      </view>
+    </view>
+    <view wx:if="{{!filteredKindList.length}}" class="empty">No matching birds found.</view>
+  </view>
+
+  <view wx:if="{{activeTab === 'records'}}" class="list">
+    <view wx:if="{{!loadingRecords && !recordList.length && !hasAuthToken}}" class="empty">
+      <text>Login to view your records.</text>
+      <button class="login-btn" bindtap="onGoLogin">Go to Login</button>
+    </view>
+
+    <view wx:if="{{!loadingRecords && !recordList.length && hasAuthToken}}" class="empty">No records yet.</view>
+
+    <view wx:if="{{recordList.length}}">
+      <view wx:for="{{recordList}}" wx:key="recordId" class="item" data-index="{{index}}" bindtap="onOpenRecord">
+        <image wx:if="{{item.thumbUrl}}" class="thumb" src="{{item.thumbUrl}}" mode="aspectFill" />
+        <view wx:else class="thumb record-placeholder"></view>
+        <view class="main">
+          <view class="sn">{{item.birdName}}</view>
+          <view class="en">{{item.createdAtText}}</view>
+          <view class="meta">Confidence {{item.confidenceText}}</view>
+        </view>
+        <view class="info-wrap">
+          <text class="info-icon">i</text>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{loadingRecords}}" class="empty">Loading...</view>
+  </view>
+</view>

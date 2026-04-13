@@ -1,36 +1,33 @@
-const { auth, birds, posts, users } = require("../../src/api/index");
-const { request } = require("../../utils/request");
+const { birds, users } = require("../../src/api/index");
+const { requireAuth } = require("../../utils/auth");
+const { toPercent, toFullImageUrl } = require("../../utils/format");
+const { BIRD_KNOWLEDGE, findBirdByName } = require("../../utils/bird-knowledge");
 
-function stringifyPayload(payload) {
-  return JSON.stringify(payload, null, 2);
+const RECORD_IMAGE_MAP_KEY = "recordImageMap";
+
+function chooseImageFromCamera() {
+  return new Promise((resolve, reject) => {
+    wx.chooseImage({
+      count: 1,
+      sourceType: ["camera"],
+      sizeType: ["compressed"],
+      success: (res) => {
+        const firstPath = res.tempFilePaths && res.tempFilePaths[0];
+        resolve({
+          tempFiles: firstPath ? [{ tempFilePath: firstPath }] : []
+        });
+      },
+      fail: reject
+    });
+  });
 }
 
-function formatError(error) {
-  if (!error) {
-    return "unknown error";
-  }
-
-  if (error.message) {
-    return error.message;
-  }
-
-  if (error.errMsg) {
-    return error.errMsg;
-  }
-
-  if (error.statusCode || error.code) {
-    return stringifyPayload(error);
-  }
-
-  return String(error);
-}
-
-function chooseImageFile() {
+function chooseImageFromAlbum() {
   return new Promise((resolve, reject) => {
     wx.chooseMedia({
       count: 1,
       mediaType: ["image"],
-      sourceType: ["album", "camera"],
+      sourceType: ["album"],
       success: resolve,
       fail: reject
     });
@@ -39,344 +36,210 @@ function chooseImageFile() {
 
 Page({
   data: {
-    email: "bird@example.com",
-    password: "12345678",
-    keyword: "",
-    postContent: "今天在湿地拍到了白鹭，正在做 API 联调演示。",
-    loadingText: "",
+    userName: "Guest",
     hasToken: false,
-    healthText: "点击按钮检查后端接口状态",
-    currentUser: null,
-    posts: [],
-    records: [],
-    recognizeResult: null,
-    lastResultTitle: "最近一次接口响应",
-    lastResultText: "这里会显示接口返回结果，方便截图和联调。"
-  },
-
-  onLoad() {
-    this.syncTokenState();
+    loading: false,
+    recognized: null,
+    backgroundImage: "",
+    isMyBird: false
   },
 
   onShow() {
-    this.syncTokenState();
-    this.onFetchPosts();
-    if (this.data.hasToken) {
-      this.bootstrapAuthedData();
-    }
-  },
-
-  syncTokenState() {
     const token = wx.getStorageSync("accessToken");
+    if (!token) {
+      wx.reLaunch({ url: "/pages/login/login" });
+      return;
+    }
+
+    const userBrief = wx.getStorageSync("userBrief") || {};
     this.setData({
-      hasToken: Boolean(token)
+      hasToken: Boolean(token),
+      userName: userBrief.username || "Guest"
     });
+
+    this.loadCurrentUser();
   },
 
-  setLoading(loadingText = "") {
-    this.setData({ loadingText });
-  },
-
-  clearLoading() {
-    this.setData({ loadingText: "" });
-  },
-
-  updateLastResult(title, payload) {
-    this.setData({
-      lastResultTitle: title,
-      lastResultText: typeof payload === "string" ? payload : stringifyPayload(payload)
-    });
-  },
-
-  ensureLogin() {
-    if (this.data.hasToken) {
-      return true;
-    }
-
-    wx.showToast({
-      title: "请先登录",
-      icon: "none"
-    });
-    return false;
-  },
-
-  async bootstrapAuthedData() {
+  async loadCurrentUser() {
     try {
-      await Promise.all([
-        this.onFetchUser({ silent: true }),
-        this.onFetchRecords({ silent: true })
-      ]);
+      const res = await users.getCurrentUser();
+      wx.setStorageSync("userBrief", {
+        id: res.data.id,
+        username: res.data.username,
+        avatarUrl: res.data.avatarUrl
+      });
+      this.setData({ userName: res.data.username || "Guest" });
     } catch (error) {
-      this.updateLastResult("自动刷新失败", formatError(error));
-    }
-  },
-
-  onEmailInput(event) {
-    this.setData({ email: event.detail.value });
-  },
-
-  onPasswordInput(event) {
-    this.setData({ password: event.detail.value });
-  },
-
-  onKeywordInput(event) {
-    this.setData({ keyword: event.detail.value });
-  },
-
-  onPostContentInput(event) {
-    this.setData({ postContent: event.detail.value });
-  },
-
-  async onCheckHealth() {
-    this.setLoading("正在检查服务状态");
-    try {
-      const response = await request({
-        url: "/api/v1/health"
-      });
-      this.setData({
-        healthText: stringifyPayload(response)
-      });
-      this.updateLastResult("健康检查成功", response);
-    } catch (error) {
-      const message = formatError(error);
-      this.setData({
-        healthText: message
-      });
-      this.updateLastResult("健康检查失败", message);
-    } finally {
-      this.clearLoading();
-    }
-  },
-
-  async onQuickLogin() {
-    this.setLoading("正在登录");
-    try {
-      const response = await auth.login({
-        email: this.data.email,
-        password: this.data.password
-      });
-      this.syncTokenState();
-      this.updateLastResult("登录成功", response);
-      await this.bootstrapAuthedData();
-      await this.onFetchPosts({ silent: true });
-    } catch (error) {
-      this.updateLastResult("登录失败", formatError(error));
-    } finally {
-      this.clearLoading();
-    }
-  },
-
-  async onLogout() {
-    this.setLoading("正在登出");
-    try {
-      const response = await auth.logout();
-      this.syncTokenState();
-      this.setData({
-        currentUser: null,
-        records: [],
-        recognizeResult: null
-      });
-      this.updateLastResult("登出成功", response);
-    } catch (error) {
-      this.updateLastResult("登出失败", formatError(error));
-    } finally {
-      this.clearLoading();
-    }
-  },
-
-  async onFetchUser(options = {}) {
-    if (!this.ensureLogin()) {
-      return;
-    }
-
-    if (!options.silent) {
-      this.setLoading("正在获取用户信息");
-    }
-
-    try {
-      const response = await users.getCurrentUser();
-      this.setData({
-        currentUser: response.data
-      });
-      this.updateLastResult("获取当前用户成功", response);
-      return response;
-    } catch (error) {
-      this.updateLastResult("获取当前用户失败", formatError(error));
-      throw error;
-    } finally {
-      if (!options.silent) {
-        this.clearLoading();
+      if (error && error.statusCode === 401) {
+        wx.removeStorageSync("accessToken");
+        this.setData({ hasToken: false });
       }
     }
   },
 
-  async onFetchPosts(options = {}) {
-    if (!options.silent) {
-      this.setLoading("正在获取帖子列表");
-    }
-
-    try {
-      const response = await posts.list({
-        page: 1,
-        pageSize: 10,
-        keyword: this.data.keyword
-      });
-      this.setData({
-        posts: response.data.list || []
-      });
-      this.updateLastResult("获取帖子列表成功", response);
-      return response;
-    } catch (error) {
-      this.updateLastResult("获取帖子列表失败", formatError(error));
-      throw error;
-    } finally {
-      if (!options.silent) {
-        this.clearLoading();
-      }
-    }
-  },
-
-  async onFetchRecords(options = {}) {
-    if (!this.ensureLogin()) {
-      return;
-    }
-
-    if (!options.silent) {
-      this.setLoading("正在获取识别记录");
-    }
-
-    try {
-      const response = await birds.getRecords({
-        page: 1,
-        pageSize: 10
-      });
-      this.setData({
-        records: response.data.list || []
-      });
-      this.updateLastResult("获取识别记录成功", response);
-      return response;
-    } catch (error) {
-      this.updateLastResult("获取识别记录失败", formatError(error));
-      throw error;
-    } finally {
-      if (!options.silent) {
-        this.clearLoading();
-      }
-    }
-  },
-
-  async onCreatePost() {
-    if (!this.ensureLogin()) {
-      return;
-    }
-
-    this.setLoading("正在发布帖子");
-    try {
-      const response = await posts.create({
-        content: this.data.postContent,
-        imageUrl: "/uploads/demo_post.jpg"
-      });
-      this.updateLastResult("发布帖子成功", response);
-      await this.onFetchPosts({ silent: true });
-    } catch (error) {
-      this.updateLastResult("发布帖子失败", formatError(error));
-    } finally {
-      this.clearLoading();
-    }
-  },
-
-  async onLikePost(event) {
-    if (!this.ensureLogin()) {
-      return;
-    }
-
-    const { id } = event.currentTarget.dataset;
-    this.setLoading("正在点赞帖子");
-    try {
-      const response = await posts.like(id);
-      this.updateLastResult("点赞成功", response);
-      await this.onFetchPosts({ silent: true });
-    } catch (error) {
-      this.updateLastResult("点赞失败", formatError(error));
-    } finally {
-      this.clearLoading();
-    }
-  },
-
-  async onViewPostDetail(event) {
-    const { id } = event.currentTarget.dataset;
-    this.setLoading("正在获取帖子详情");
-    try {
-      const response = await posts.detail(id);
-      this.updateLastResult("帖子详情", response);
-    } catch (error) {
-      this.updateLastResult("获取帖子详情失败", formatError(error));
-    } finally {
-      this.clearLoading();
-    }
-  },
-
-  async onUpdatePost(event) {
-    if (!this.ensureLogin()) {
-      return;
-    }
-
-    const { id, content } = event.currentTarget.dataset;
-    this.setLoading("正在更新帖子");
-    try {
-      const response = await posts.update(id, {
-        content: `${content}（已更新）`,
-        imageUrl: "/uploads/demo_post_updated.jpg"
-      });
-      this.updateLastResult("更新帖子成功", response);
-      await this.onFetchPosts({ silent: true });
-    } catch (error) {
-      this.updateLastResult("更新帖子失败", formatError(error));
-    } finally {
-      this.clearLoading();
-    }
-  },
-
-  async onDeletePost(event) {
-    if (!this.ensureLogin()) {
-      return;
-    }
-
-    const { id } = event.currentTarget.dataset;
-    this.setLoading("正在删除帖子");
-    try {
-      const response = await posts.remove(id);
-      this.updateLastResult("删除帖子成功", response);
-      await this.onFetchPosts({ silent: true });
-    } catch (error) {
-      this.updateLastResult("删除帖子失败", formatError(error));
-    } finally {
-      this.clearLoading();
-    }
-  },
-
-  async onChooseImageRecognize() {
-    if (!this.ensureLogin()) {
+  async handleRecognize(source) {
+    if (!requireAuth()) {
       return;
     }
 
     try {
-      const chooseResult = await chooseImageFile();
-      const file = chooseResult.tempFiles[0];
-      this.setLoading("正在上传图片识别");
-      const response = await birds.recognize(file.tempFilePath);
-      this.setData({
-        recognizeResult: response.data
-      });
-      this.updateLastResult("图片识别成功", response);
-      await this.onFetchRecords({ silent: true });
-    } catch (error) {
-      if (error && error.errMsg && error.errMsg.indexOf("cancel") >= 0) {
+      const chooseRes = source === "camera" ? await chooseImageFromCamera() : await chooseImageFromAlbum();
+      const file = chooseRes.tempFiles && chooseRes.tempFiles[0];
+      if (!file || !file.tempFilePath) {
         return;
       }
-      this.updateLastResult("图片识别失败", formatError(error));
+
+      this.setData({
+        loading: true,
+        backgroundImage: file.tempFilePath
+      });
+
+      const res = await birds.recognize(file.tempFilePath);
+      const matchedBird = findBirdByName(res.data.birdName);
+      const recognized = {
+        ...res.data,
+        confidenceText: toPercent(res.data.confidence),
+        fullImageUrl: toFullImageUrl(res.data.imageUrl),
+        localTempPath: file.tempFilePath,
+        detailId: matchedBird ? matchedBird.id : null
+      };
+
+      wx.setStorageSync("latestRecognizeResult", recognized);
+      this.setData({
+        recognized,
+        isMyBird: false
+      });
+      wx.showToast({ title: "Recognition done", icon: "success" });
+    } catch (error) {
+      if (error && error.errMsg && error.errMsg.includes("cancel")) {
+        if (!this.data.recognized) {
+          this.setData({ backgroundImage: "" });
+        }
+        return;
+      }
+      wx.showToast({ title: (error && error.message) || "Recognition failed", icon: "none" });
     } finally {
-      this.clearLoading();
+      this.setData({ loading: false });
     }
+  },
+
+  onStartRecording() {
+    this.handleRecognize("camera");
+  },
+
+  onSelectPhoto() {
+    this.handleRecognize("album");
+  },
+
+  onOpenBirdDetail() {
+    const { recognized } = this.data;
+    if (!recognized || !recognized.birdName) {
+      wx.showToast({ title: "No bird recognized yet", icon: "none" });
+      return;
+    }
+
+    if (recognized.detailId) {
+      wx.navigateTo({ url: `/pages/bird-detail/bird-detail?id=${recognized.detailId}` });
+      return;
+    }
+
+    wx.navigateTo({
+      url: `/pages/bird-detail/bird-detail?name=${encodeURIComponent(recognized.birdName)}`
+    });
+  },
+
+  onMarkAsMyBird() {
+    if (!requireAuth()) {
+      return;
+    }
+
+    const { recognized } = this.data;
+    if (!recognized || !recognized.birdName) {
+      this.onQuickSighting();
+      return;
+    }
+
+    this.addRecordToMyBirds(recognized);
+  },
+
+  onQuickSighting() {
+    const quickBirds = BIRD_KNOWLEDGE.slice(0, 6).filter((item) => item.commonName || item.chineseName);
+    const options = quickBirds.map((item) => item.commonName || item.chineseName);
+    if (!quickBirds.length) {
+      wx.showToast({ title: "No species data", icon: "none" });
+      return;
+    }
+
+    wx.showActionSheet({
+      itemList: options,
+      success: (res) => {
+        const selected = quickBirds[res.tapIndex];
+        if (!selected) {
+          return;
+        }
+
+        const manualRecord = {
+          recordId: Date.now(),
+          birdName: selected.commonName || selected.chineseName || "Unknown Bird",
+          imageUrl: "",
+          createdAt: new Date().toISOString(),
+          confidence: 0,
+          confidenceText: "-",
+          fullImageUrl: "",
+          localTempPath: "",
+          detailId: selected.id || null,
+          source: "manual"
+        };
+
+        wx.setStorageSync("latestRecognizeResult", manualRecord);
+        this.setData({
+          recognized: manualRecord,
+          isMyBird: false
+        });
+
+        this.addRecordToMyBirds(manualRecord, "Added as sighting");
+      }
+    });
+  },
+
+  addRecordToMyBirds(record, successTitle = "Added to My Birds") {
+    const list = wx.getStorageSync("myBirds") || [];
+    const exists = list.some((item) => item.recordId === record.recordId);
+
+    // Persist "recordId -> captured image" mapping so My recordings can always
+    // render the actual photo captured by user.
+    const recordImageMap = wx.getStorageSync(RECORD_IMAGE_MAP_KEY) || {};
+    const recordIdKey = String(record.recordId || "");
+    const capturedImage = record.localTempPath || record.fullImageUrl || record.imageUrl || "";
+    if (recordIdKey && capturedImage) {
+      wx.setStorageSync(RECORD_IMAGE_MAP_KEY, {
+        ...recordImageMap,
+        [recordIdKey]: capturedImage
+      });
+    }
+
+    if (exists) {
+      this.setData({ isMyBird: true });
+      wx.showToast({ title: "Already in My Birds", icon: "none" });
+      return;
+    }
+
+    wx.setStorageSync("myBirds", [
+      {
+        recordId: record.recordId || Date.now(),
+        birdName: record.birdName,
+        imageUrl: record.fullImageUrl || record.localTempPath || "",
+        createdAt: record.createdAt || new Date().toISOString(),
+        confidence: record.confidence
+      },
+      ...list
+    ]);
+
+    this.setData({ isMyBird: true });
+    wx.setStorageSync("encyclopediaInitialTab", "records");
+    wx.showToast({ title: successTitle, icon: "success" });
+    setTimeout(() => {
+      wx.switchTab({ url: "/pages/encyclopedia/encyclopedia" });
+    }, 160);
   }
 });

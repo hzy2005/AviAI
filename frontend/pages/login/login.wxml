@@ -1,0 +1,58 @@
+<view class="auth-page">
+  <view class="hero">
+
+    <view class="title-block">
+      <text class="title-line">Hello again !</text>
+      <text class="title-line">Welcome</text>
+      <text class="title-line">Back</text>
+    </view>
+
+    <view class="hero-bird-wrap">
+      <image class="hero-bird" src="/static/view/login and register.png" mode="aspectFill" />
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="field-wrap">
+      <input class="field" type="text" placeholder="Email" placeholder-class="field-placeholder" value="{{email}}" bindinput="onEmailInput" />
+      <image class="field-icon" src="/static/icons/icon-user.png" />
+    </view>
+
+    <view class="field-wrap">
+      <input
+        class="field"
+        password="{{!showPassword}}"
+        placeholder="Password"
+        placeholder-class="field-placeholder"
+        value="{{password}}"
+        bindinput="onPasswordInput"
+      />
+      <image 
+        class="field-icon" 
+        src="{{showPassword ? '/static/icons/eye-open.png' : '/static/icons/eye-close.png'}}"
+        bindtap="togglePassword"
+      />
+    </view>
+
+    <view class="btn-wrap">
+      <button class="primary-btn" loading="{{loading}}" bindtap="onSignIn">Sign In</button>
+    </view>
+
+    <view class="switch-row">
+      <text class="switch-tip">Don't have an account?</text>
+      <text class="switch-link" bindtap="onGoSignup">Sign Up</text>
+    </view>
+
+    <view class="lower-bird-wrap">
+      <image class="small-bird" src="/static/view/loginbird.png" mode="aspectFit" />
+    </view>
+  </view>
+
+  <view class="wave-wrap">
+    <!-- 底层（深色） -->
+    <image class="wave-svg wave-back" src="/static/view/wave-dark.svg" mode="widthFix" />
+
+    <!-- 上层（浅色） -->
+    <image class="wave-svg wave-front" src="/static/view/wave-light.svg" mode="widthFix" />
+  </view>
+</view>
