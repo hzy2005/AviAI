@@ -68,6 +68,16 @@ def _serialize_post_item(post: Post, author: dict) -> dict:
     }
 
 
+def _serialize_bird_record_item(record: BirdRecord) -> dict:
+    return {
+        "recordId": record.id,
+        "birdName": record.bird_name,
+        "confidence": float(record.confidence),
+        "imageUrl": record.image_url,
+        "createdAt": _dt_to_iso(record.created_at),
+    }
+
+
 def find_user_by_id(user_id: int):
     try:
         with SessionLocal() as db:
@@ -284,13 +294,7 @@ def recognize_bird_for_user(
             db.commit()
             db.refresh(record)
 
-            return {
-                "recordId": record.id,
-                "birdName": record.bird_name,
-                "confidence": float(record.confidence),
-                "imageUrl": record.image_url,
-                "createdAt": _dt_to_iso(record.created_at),
-            }, None
+            return _serialize_bird_record_item(record), None
     except SQLAlchemyError:
         return None, (1005, "服务内部错误", 500)
 
@@ -315,20 +319,64 @@ def list_bird_records(current_user: Optional[dict], page: int, page_size: int):
             ).all()
 
             return {
-                "list": [
-                    {
-                        "recordId": record.id,
-                        "birdName": record.bird_name,
-                        "confidence": float(record.confidence),
-                        "imageUrl": record.image_url,
-                        "createdAt": _dt_to_iso(record.created_at),
-                    }
-                    for record in records
-                ],
+                "list": [_serialize_bird_record_item(record) for record in records],
                 "total": int(total),
                 "page": page,
                 "pageSize": page_size,
             }, None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
+
+
+def get_bird_record_detail(current_user: Optional[dict], record_id: int):
+    if not current_user:
+        return None, (1002, "未登录或 Token 无效", 401)
+
+    try:
+        with SessionLocal() as db:
+            record = db.get(BirdRecord, record_id)
+            if not record:
+                return None, (1004, "资源不存在", 404)
+            if record.user_id != current_user["id"]:
+                return None, (1003, "无权限", 403)
+            return _serialize_bird_record_item(record), None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
+
+
+def update_bird_record(current_user: Optional[dict], record_id: int, bird_name: str):
+    if not current_user:
+        return None, (1002, "未登录或 Token 无效", 401)
+
+    try:
+        with SessionLocal() as db:
+            record = db.get(BirdRecord, record_id)
+            if not record:
+                return None, (1004, "资源不存在", 404)
+            if record.user_id != current_user["id"]:
+                return None, (1003, "无权限", 403)
+            record.bird_name = bird_name.strip()
+            db.commit()
+            db.refresh(record)
+            return _serialize_bird_record_item(record), None
+    except SQLAlchemyError:
+        return None, (1005, "服务内部错误", 500)
+
+
+def delete_bird_record(current_user: Optional[dict], record_id: int):
+    if not current_user:
+        return None, (1002, "未登录或 Token 无效", 401)
+
+    try:
+        with SessionLocal() as db:
+            record = db.get(BirdRecord, record_id)
+            if not record:
+                return None, (1004, "资源不存在", 404)
+            if record.user_id != current_user["id"]:
+                return None, (1003, "无权限", 403)
+            db.delete(record)
+            db.commit()
+            return {"recordId": record_id, "deleted": True}, None
     except SQLAlchemyError:
         return None, (1005, "服务内部错误", 500)
 

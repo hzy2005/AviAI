@@ -228,7 +228,7 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(list_response.status_code, 200)
         list_body = list_response.json()
         self.assertEqual(list_body["code"], 0)
-        self.assertEqual(list_body["message"], "ok")
+        self.assertEqual(list_body["msg"], "success")
         self.assertSetEqual(
             set(list_body["data"].keys()),
             {"list", "total", "page", "pageSize"},
@@ -252,7 +252,7 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(detail_response.status_code, 200)
         detail_body = detail_response.json()
         self.assertEqual(detail_body["code"], 0)
-        self.assertEqual(detail_body["message"], "ok")
+        self.assertEqual(detail_body["msg"], "success")
         self.assert_post_contract_shape(detail_body["data"])
         self.assertEqual(detail_body["data"]["postId"], created_post_id)
 
@@ -397,6 +397,18 @@ class ApiTestCase(unittest.TestCase):
         response = self.client.get("/api/v1/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["code"], 0)
+        self.assertEqual(response.json()["msg"], "success")
+
+    def test_validation_error_unified_response(self):
+        response = self.client.post(
+            "/api/v1/auth/register",
+            json={"username": "a", "email": "x", "password": "1"},
+        )
+        self.assertEqual(response.status_code, 400)
+        body = response.json()
+        self.assertEqual(body["code"], 1001)
+        self.assertEqual(body["msg"], "参数错误")
+        self.assertIsNotNone(body["data"])
 
     def test_register_and_login(self):
         register_response = self.client.post(
@@ -432,7 +444,7 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(register_response.status_code, 201)
         register_body = register_response.json()
         self.assertEqual(register_body["code"], 0)
-        self.assertEqual(register_body["message"], "ok")
+        self.assertEqual(register_body["msg"], "success")
         self.assertIn("userId", register_body["data"])
 
         login_response = self.client.post(
@@ -442,7 +454,7 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(login_response.status_code, 200)
         login_body = login_response.json()
         self.assertEqual(login_body["code"], 0)
-        self.assertEqual(login_body["message"], "ok")
+        self.assertEqual(login_body["msg"], "success")
         self.assertIn("token", login_body["data"])
         self.assertIn("user", login_body["data"])
         self.assertSetEqual(
@@ -458,7 +470,7 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(me_response.status_code, 200)
         me_body = me_response.json()
         self.assertEqual(me_body["code"], 0)
-        self.assertEqual(me_body["message"], "ok")
+        self.assertEqual(me_body["msg"], "success")
         self.assertSetEqual(
             set(me_body["data"].keys()),
             {"id", "username", "email", "avatarUrl", "createdAt"},
@@ -469,7 +481,7 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(logout_response.status_code, 200)
         logout_body = logout_response.json()
         self.assertEqual(logout_body["code"], 0)
-        self.assertEqual(logout_body["message"], "ok")
+        self.assertEqual(logout_body["msg"], "success")
         self.assertSetEqual(set(logout_body["data"].keys()), {"success"})
         self.assertTrue(logout_body["data"]["success"])
 
@@ -492,7 +504,7 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(recognize_response.status_code, 201)
         recognize_body = recognize_response.json()
         self.assertEqual(recognize_body["code"], 0)
-        self.assertEqual(recognize_body["message"], "ok")
+        self.assertEqual(recognize_body["msg"], "success")
         self.assertSetEqual(
             set(recognize_body["data"].keys()),
             {"recordId", "birdName", "confidence", "imageUrl", "createdAt"},
@@ -508,7 +520,7 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(records_response.status_code, 200)
         records_body = records_response.json()
         self.assertEqual(records_body["code"], 0)
-        self.assertEqual(records_body["message"], "ok")
+        self.assertEqual(records_body["msg"], "success")
         self.assertSetEqual(
             set(records_body["data"].keys()),
             {"list", "total", "page", "pageSize"},
@@ -547,6 +559,38 @@ class ApiTestCase(unittest.TestCase):
         recognize_invalid_file_body = recognize_invalid_file.json()
         self.assertEqual(recognize_invalid_file_body["code"], 1006)
         self.assertIsNone(recognize_invalid_file_body["data"])
+
+    def test_birds_records_crud_contract(self):
+        token = self.login()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        recognize_response = self.client.post(
+            "/api/v1/birds/recognize",
+            headers=headers,
+            files={"image": ("birds-crud.png", io.BytesIO(self.valid_image_bytes()), "image/png")},
+        )
+        self.assertEqual(recognize_response.status_code, 201)
+        record_id = recognize_response.json()["data"]["recordId"]
+
+        detail_response = self.client.get(f"/api/v1/birds/records/{record_id}", headers=headers)
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertEqual(detail_response.json()["data"]["recordId"], record_id)
+
+        update_response = self.client.put(
+            f"/api/v1/birds/records/{record_id}",
+            headers=headers,
+            json={"birdName": "Manual Corrected Bird"},
+        )
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.json()["data"]["birdName"], "Manual Corrected Bird")
+
+        delete_response = self.client.delete(f"/api/v1/birds/records/{record_id}", headers=headers)
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertTrue(delete_response.json()["data"]["deleted"])
+
+        detail_not_found = self.client.get(f"/api/v1/birds/records/{record_id}", headers=headers)
+        self.assertEqual(detail_not_found.status_code, 404)
+        self.assertEqual(detail_not_found.json()["code"], 1004)
 
     def test_user_and_records(self):
         token = self.login()
