@@ -2,6 +2,7 @@ import io
 import sys
 import unittest
 import uuid
+import base64
 from pathlib import Path
 
 CURRENT_FILE = Path(__file__).resolve()
@@ -60,6 +61,13 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(login_response.status_code, 200)
         return login_response.json()["data"]["token"]
 
+    @staticmethod
+    def valid_image_bytes():
+        # 1x1 transparent PNG
+        return base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Zl8QAAAAASUVORK5CYII="
+        )
+
     def assert_post_contract_shape(self, post_data):
         self.assertSetEqual(
             set(post_data.keys()),
@@ -113,7 +121,7 @@ class ApiTestCase(unittest.TestCase):
         recognize_response = self.client.post(
             "/api/v1/birds/recognize",
             headers=headers,
-            files={"image": ("e2e-bird.jpg", io.BytesIO(b"fake-image"), "image/jpeg")},
+            files={"image": ("e2e-bird.jpg", io.BytesIO(self.valid_image_bytes()), "image/jpeg")},
         )
         self.assertEqual(recognize_response.status_code, 201)
         recognize_data = recognize_response.json()["data"]
@@ -479,7 +487,7 @@ class ApiTestCase(unittest.TestCase):
         recognize_response = self.client.post(
             "/api/v1/birds/recognize",
             headers=headers,
-            files={"image": ("contract-bird.png", io.BytesIO(b"fake-image"), "image/png")},
+            files={"image": ("contract-bird.png", io.BytesIO(self.valid_image_bytes()), "image/png")},
         )
         self.assertEqual(recognize_response.status_code, 201)
         recognize_body = recognize_response.json()
@@ -521,7 +529,7 @@ class ApiTestCase(unittest.TestCase):
 
         recognize_unauthorized = self.client.post(
             "/api/v1/birds/recognize",
-            files={"image": ("no-token.jpg", io.BytesIO(b"fake-image"), "image/jpeg")},
+            files={"image": ("no-token.jpg", io.BytesIO(self.valid_image_bytes()), "image/jpeg")},
         )
         self.assertEqual(recognize_unauthorized.status_code, 401)
         recognize_unauthorized_body = recognize_unauthorized.json()
@@ -551,7 +559,7 @@ class ApiTestCase(unittest.TestCase):
         recognize_response = self.client.post(
             "/api/v1/birds/recognize",
             headers=headers,
-            files={"image": ("records-check.jpg", io.BytesIO(b"fake-image"), "image/jpeg")},
+            files={"image": ("records-check.jpg", io.BytesIO(self.valid_image_bytes()), "image/jpeg")},
         )
         self.assertEqual(recognize_response.status_code, 201)
 
@@ -566,7 +574,7 @@ class ApiTestCase(unittest.TestCase):
         recognize_response = self.client.post(
             "/api/v1/birds/recognize",
             headers=headers,
-            files={"image": ("egret.jpg", io.BytesIO(b"fake-image"), "image/jpeg")},
+            files={"image": ("egret.jpg", io.BytesIO(self.valid_image_bytes()), "image/jpeg")},
         )
         self.assertEqual(recognize_response.status_code, 201)
 
