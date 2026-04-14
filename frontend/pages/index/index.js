@@ -1,17 +1,22 @@
 const { birds, users } = require("../../src/api/index");
 const { requireAuth } = require("../../utils/auth");
 const { toPercent, toFullImageUrl } = require("../../utils/format");
-const { findBirdByName } = require("../../utils/bird-knowledge");
+const { BIRD_KNOWLEDGE, findBirdByName } = require("../../utils/bird-knowledge");
 
 const RECORD_IMAGE_MAP_KEY = "recordImageMap";
 
 function chooseImageFromCamera() {
   return new Promise((resolve, reject) => {
-    wx.chooseMedia({
+    wx.chooseImage({
       count: 1,
-      mediaType: ["image"],
       sourceType: ["camera"],
-      success: resolve,
+      sizeType: ["compressed"],
+      success: (res) => {
+        const firstPath = res.tempFilePaths && res.tempFilePaths[0];
+        resolve({
+          tempFiles: firstPath ? [{ tempFilePath: firstPath }] : []
+        });
+      },
       fail: reject
     });
   });
@@ -150,18 +155,62 @@ Page({
 
     const { recognized } = this.data;
     if (!recognized || !recognized.birdName) {
-      wx.showToast({ title: "Recognize a bird first", icon: "none" });
+      this.onQuickSighting();
       return;
     }
 
+    this.addRecordToMyBirds(recognized);
+  },
+
+  onQuickSighting() {
+    const quickBirds = BIRD_KNOWLEDGE.slice(0, 6).filter((item) => item.commonName || item.chineseName);
+    const options = quickBirds.map((item) => item.commonName || item.chineseName);
+    if (!quickBirds.length) {
+      wx.showToast({ title: "No species data", icon: "none" });
+      return;
+    }
+
+    wx.showActionSheet({
+      itemList: options,
+      success: (res) => {
+        const selected = quickBirds[res.tapIndex];
+        if (!selected) {
+          return;
+        }
+
+        const manualRecord = {
+          recordId: Date.now(),
+          birdName: selected.commonName || selected.chineseName || "Unknown Bird",
+          imageUrl: "",
+          createdAt: new Date().toISOString(),
+          confidence: 0,
+          confidenceText: "-",
+          fullImageUrl: "",
+          localTempPath: "",
+          detailId: selected.id || null,
+          source: "manual"
+        };
+
+        wx.setStorageSync("latestRecognizeResult", manualRecord);
+        this.setData({
+          recognized: manualRecord,
+          isMyBird: false
+        });
+
+        this.addRecordToMyBirds(manualRecord, "Added as sighting");
+      }
+    });
+  },
+
+  addRecordToMyBirds(record, successTitle = "Added to My Birds") {
     const list = wx.getStorageSync("myBirds") || [];
-    const exists = list.some((item) => item.recordId === recognized.recordId);
+    const exists = list.some((item) => item.recordId === record.recordId);
 
     // Persist "recordId -> captured image" mapping so My recordings can always
     // render the actual photo captured by user.
     const recordImageMap = wx.getStorageSync(RECORD_IMAGE_MAP_KEY) || {};
-    const recordIdKey = String(recognized.recordId || "");
-    const capturedImage = recognized.localTempPath || recognized.fullImageUrl || recognized.imageUrl || "";
+    const recordIdKey = String(record.recordId || "");
+    const capturedImage = record.localTempPath || record.fullImageUrl || record.imageUrl || "";
     if (recordIdKey && capturedImage) {
       wx.setStorageSync(RECORD_IMAGE_MAP_KEY, {
         ...recordImageMap,
@@ -177,18 +226,18 @@ Page({
 
     wx.setStorageSync("myBirds", [
       {
-        recordId: recognized.recordId || Date.now(),
-        birdName: recognized.birdName,
-        imageUrl: recognized.fullImageUrl || recognized.localTempPath || "",
-        createdAt: recognized.createdAt || new Date().toISOString(),
-        confidence: recognized.confidence
+        recordId: record.recordId || Date.now(),
+        birdName: record.birdName,
+        imageUrl: record.fullImageUrl || record.localTempPath || "",
+        createdAt: record.createdAt || new Date().toISOString(),
+        confidence: record.confidence
       },
       ...list
     ]);
 
     this.setData({ isMyBird: true });
     wx.setStorageSync("encyclopediaInitialTab", "records");
-    wx.showToast({ title: "Added to My Birds", icon: "success" });
+    wx.showToast({ title: successTitle, icon: "success" });
     setTimeout(() => {
       wx.switchTab({ url: "/pages/encyclopedia/encyclopedia" });
     }, 160);

@@ -9,7 +9,7 @@ const baseUrl = isDevtools ? DEV_BASE_URL : LAN_BASE_URL;
 // Temporary development mode:
 // force all API calls to use local mock handlers first.
 const enableOfflineMock = true;
-const preferOfflineMock = true;
+const preferOfflineMock = false;
 
 module.exports = {
   baseUrl,

@@ -22,3 +22,7 @@ class CreatePostRequest(BaseModel):
 class CreateCommentRequest(BaseModel):
     content: str = Field(min_length=1, max_length=500)
     parentId: Optional[int] = None
+
+
+class UpdateBirdRecordRequest(BaseModel):
+    birdName: str = Field(min_length=1, max_length=100)
