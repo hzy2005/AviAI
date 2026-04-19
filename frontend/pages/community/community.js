@@ -28,6 +28,10 @@ function getDisplayTitle(content) {
   return text.length > 26 ? `${text.slice(0, 26)}...` : text;
 }
 
+function getDraftAiButtonText(content) {
+  return String(content || "").trim() ? "AI Polish" : "AI Generate";
+}
+
 Page({
   data: {
     posts: [],
@@ -47,6 +51,8 @@ Page({
     showMask: false,
     draftContent: "",
     draftImages: [],
+    draftAiButtonText: "AI Generate",
+    aiCopyLoading: false,
     submitting: false,
     editingPostId: null,
     editingContent: "",
@@ -227,7 +233,8 @@ Page({
       showCreateModal: true,
       showManageModal: false,
       showSearch: false,
-      showMask: true
+      showMask: true,
+      draftAiButtonText: getDraftAiButtonText(this.data.draftContent)
     });
   },
 
@@ -250,6 +257,7 @@ Page({
       showCreateModal: false,
       showManageModal: false,
       showMask: false,
+      aiCopyLoading: false,
       editingPostId: null,
       editingContent: "",
       editingImages: []
@@ -259,7 +267,11 @@ Page({
   onStopBubble() {},
 
   onDraftInput(event) {
-    this.setData({ draftContent: event.detail.value });
+    const draftContent = event.detail.value;
+    this.setData({
+      draftContent,
+      draftAiButtonText: getDraftAiButtonText(draftContent)
+    });
   },
 
   async onChooseDraftImages() {
@@ -288,6 +300,42 @@ Page({
     this.setData({ draftImages: next });
   },
 
+  async onGenerateAICopy() {
+    if (!requireAuth()) return;
+
+    const imageUrl = this.data.draftImages[0] || "";
+    const content = this.data.draftContent.trim();
+
+    if (!imageUrl) {
+      wx.showToast({ title: "Please add a photo first", icon: "none" });
+      return;
+    }
+
+    const mode = content ? "polish" : "generate";
+
+    try {
+      this.setData({ aiCopyLoading: true });
+      const res = await posts.aiCopywriting({
+        mode,
+        imageUrl,
+        content
+      });
+      const nextContent = (res.data && res.data.content) || "";
+      this.setData({
+        draftContent: nextContent,
+        draftAiButtonText: getDraftAiButtonText(nextContent)
+      });
+      wx.showToast({
+        title: mode === "generate" ? "文案已生成" : "文案已润色",
+        icon: "success"
+      });
+    } catch (error) {
+      wx.showToast({ title: error.message || "AI copy failed", icon: "none" });
+    } finally {
+      this.setData({ aiCopyLoading: false });
+    }
+  },
+
   async onSubmitPost() {
     if (!requireAuth()) return;
 
@@ -307,6 +355,8 @@ Page({
       this.setData({
         draftContent: "",
         draftImages: [],
+        draftAiButtonText: "AI Generate",
+        aiCopyLoading: false,
         showCreateModal: false,
         showMask: false
       });
