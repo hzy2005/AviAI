@@ -455,6 +455,101 @@ def _find_recent_bird_hint(user_id: int, image_url: str) -> Optional[dict]:
         return None
 
 
+def _resolve_local_image_path(image_url: str) -> Optional[Path]:
+    normalized = (image_url or "").strip()
+    if not normalized:
+        return None
+
+    if normalized.startswith("/uploads/"):
+        local_path = UPLOADS_DIR / Path(normalized).name
+        return local_path if local_path.exists() else None
+
+    candidate = Path(normalized)
+    if candidate.is_file():
+        return candidate
+    return None
+
+
+def _resolve_bird_hint_for_copywriting(user_id: int, image_url: str) -> Optional[dict]:
+    hint = _find_recent_bird_hint(user_id, image_url)
+    if hint:
+        return hint
+
+    local_path = _resolve_local_image_path(image_url)
+    if not local_path:
+        return None
+
+    try:
+        bird_name, confidence = _predict_bird_from_image(local_path)
+    except Exception:
+        return None
+
+    return {"birdName": bird_name, "confidence": float(confidence or 0.0)}
+
+
+def _extract_json_from_text(text: str) -> Optional[dict]:
+    raw = (text or "").strip()
+    if not raw:
+        return None
+
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start < 0 or end <= start:
+        return None
+
+    try:
+        parsed = json.loads(raw[start : end + 1])
+        return parsed if isinstance(parsed, dict) else None
+    except json.JSONDecodeError:
+        return None
+
+
+def _extract_vision_facts(image_url: str, bird_hint: Optional[dict]) -> Optional[dict]:
+    if not _is_backend_accessible_image(image_url):
+        return None
+
+    bird_name = (bird_hint or {}).get("birdName") or "unknown"
+    prompt = (
+        "Analyze this bird image and return STRICT JSON only. "
+        "No markdown, no explanation. "
+        'Fields: {"species":"", "mainColor":"", "location":"", "action":"", "pose":"", "confidence":0}. '
+        "location must be one of: tree_branch, water_edge, water_surface, sky, ground, unknown. "
+        "action should be short and objective, for example: standing, perching, looking_back, flying, swimming. "
+        f"Species hint: {bird_name}."
+    )
+    raw = _call_deepseek_vision_chat(
+        prompt,
+        image_url,
+        model=settings.deepseek_vision_model,
+        temperature=0.2,
+        max_tokens=180,
+    )
+    facts = _extract_json_from_text(raw or "")
+    if not facts:
+        return None
+
+    return {
+        "species": str(facts.get("species", "")).strip(),
+        "mainColor": str(facts.get("mainColor", "")).strip(),
+        "location": str(facts.get("location", "")).strip(),
+        "action": str(facts.get("action", "")).strip(),
+        "pose": str(facts.get("pose", "")).strip(),
+        "confidence": float(facts.get("confidence") or 0.0),
+    }
+
+
+def _format_vision_facts(facts: Optional[dict]) -> str:
+    if not facts:
+        return "unknown"
+    return (
+        f"species={facts.get('species') or 'unknown'}, "
+        f"mainColor={facts.get('mainColor') or 'unknown'}, "
+        f"location={facts.get('location') or 'unknown'}, "
+        f"action={facts.get('action') or 'unknown'}, "
+        f"pose={facts.get('pose') or 'unknown'}"
+    )
+
+
 def _build_generate_prompt(image_url: str, bird_hint: Optional[dict]) -> str:
     bird_name = (bird_hint or {}).get("birdName") or "unknown bird"
     confidence = float((bird_hint or {}).get("confidence") or 0.0)
@@ -555,13 +650,7 @@ def _resolve_image_input_for_vision(image_url: str) -> Optional[str]:
     if normalized.startswith(("http://", "https://", "data:image/")):
         return normalized
 
-    local_path: Optional[Path] = None
-    if normalized.startswith("/uploads/"):
-        local_path = UPLOADS_DIR / Path(normalized).name
-    else:
-        candidate = Path(normalized)
-        if candidate.is_file():
-            local_path = candidate
+    local_path = _resolve_local_image_path(normalized)
 
     if not local_path or not local_path.exists():
         return None
@@ -574,6 +663,52 @@ def _resolve_image_input_for_vision(image_url: str) -> Optional[str]:
 
 def _is_backend_accessible_image(image_url: str) -> bool:
     return _resolve_image_input_for_vision(image_url) is not None
+
+
+def _build_visual_grounding_hint(image_url: str) -> str:
+    local_path = _resolve_local_image_path(image_url)
+
+    if not local_path or not local_path.exists():
+        return "unknown"
+
+    try:
+        with Image.open(local_path) as image:
+            rgb = image.convert("RGB").resize((96, 96))
+            pixels = list(rgb.getdata())
+    except (UnidentifiedImageError, OSError):
+        return "unknown"
+
+    total = len(pixels) or 1
+    avg_r = sum(p[0] for p in pixels) / total
+    avg_g = sum(p[1] for p in pixels) / total
+    avg_b = sum(p[2] for p in pixels) / total
+    brightness = (avg_r + avg_g + avg_b) / 3
+    saturation = max(avg_r, avg_g, avg_b) - min(avg_r, avg_g, avg_b)
+
+    if avg_b > avg_r + 14 and avg_b > avg_g + 10:
+        color = "blue-leaning"
+    elif avg_g > avg_r + 12 and avg_g > avg_b + 8:
+        color = "green-leaning"
+    elif avg_r > avg_g + 10 and avg_r > avg_b + 10:
+        color = "red/orange-leaning"
+    elif avg_r > 150 and avg_g > 150 and avg_b < 130:
+        color = "yellow-leaning"
+    else:
+        color = "gray/neutral"
+
+    light = "bright" if brightness >= 170 else ("dim" if brightness <= 90 else "soft")
+    sat = "high" if saturation >= 75 else ("low" if saturation <= 35 else "medium")
+    return f"dominant color={color}; lighting={light}; saturation={sat}"
+
+
+def _inject_visual_grounding(prompt: str, image_url: str) -> str:
+    hint = _build_visual_grounding_hint(image_url)
+    return (
+        f"{prompt}\n"
+        "Strict grounding rules: the color and tone you describe must align with image evidence. "
+        "Avoid generic or contradictory color wording.\n"
+        f"Visual evidence (computed locally): {hint}"
+    )
 
 
 def _call_deepseek_vision_chat(
@@ -716,26 +851,51 @@ def _call_with_quality_retry_meta(
         "fallback": not passed,
         "elapsedMs": elapsed_ms,
     }
-def _fallback_generate_copy(bird_hint: Optional[dict]) -> str:
+def _fallback_generate_copy(
+    bird_hint: Optional[dict],
+    visual_hint: Optional[str] = None,
+    vision_facts: Optional[dict] = None,
+) -> str:
     bird_name = (bird_hint or {}).get("birdName")
     confidence = float((bird_hint or {}).get("confidence") or 0.0)
     confidence_percent = round(confidence * 100, 1)
 
+    main_color = (vision_facts or {}).get("mainColor") or "羽色"
+    action = (vision_facts or {}).get("action") or "停驻"
+    location = (vision_facts or {}).get("location") or "unknown"
+    location_text_map = {
+        "tree_branch": "枝头",
+        "water_edge": "水边",
+        "water_surface": "水面",
+        "sky": "空中",
+        "ground": "地面",
+        "unknown": "画面中",
+    }
+    location_text = location_text_map.get(location, "画面中")
+
     if bird_name:
         return (
-            f"今天在公园遇到一只{bird_name}，状态特别灵动。"
-            f"从识别结果看，它的匹配置信度大约是{confidence_percent}%。"
-            "阳光下的羽色很有层次，越看越治愈。"
+            f"画面里一只{bird_name}在{location_text}{action}，主体特征比较清晰。"
+            f"从识别结果看，它的匹配置信度约为{confidence_percent}%。"
+            f"{main_color}和周围光线层次分明，整张图显得很安静。"
         )
     return (
-        "今天在公园偶遇一位羽毛小可爱，站在枝头很有气质。"
-        "安静观察了好一会儿，越看越觉得自然特别治愈。"
-        "把这一刻记录下来，分享给同样喜欢观鸟的朋友。"
+        f"画面中的小鸟在{location_text}{action}，姿态很专注。"
+        f"主体{main_color}更显眼，视觉重心集中在鸟身上。"
+        "这组细节把当下环境的安静感完整保留下来。"
     )
 
 
-def _normalize_generate_copy(content: str, bird_hint: Optional[dict]) -> str:
-    fallback_sentences = re.split(r"[。！？!?]+", _fallback_generate_copy(bird_hint))
+def _normalize_generate_copy(
+    content: str,
+    bird_hint: Optional[dict],
+    visual_hint: Optional[str] = None,
+    vision_facts: Optional[dict] = None,
+) -> str:
+    fallback_sentences = re.split(
+        r"[。！？!?]+",
+        _fallback_generate_copy(bird_hint, visual_hint=visual_hint, vision_facts=vision_facts),
+    )
     fallback_sentences = [s.strip() for s in fallback_sentences if s.strip()]
 
     normalized = (content or "").strip()
@@ -779,7 +939,6 @@ def _normalize_generate_copy(content: str, bird_hint: Optional[dict]) -> str:
         text = f"{sentences[0]}。{sentences[1]}。{third}。"
 
     return text
-
 
 def _ensure_generate_mentions_bird(content: str, bird_hint: Optional[dict]) -> str:
     bird_name = (bird_hint or {}).get("birdName")
@@ -826,6 +985,27 @@ def _normalize_polish_copy(content: str, original_content: str) -> str:
     return normalized
 
 
+def _call_polish_model_with_optional_vision(prompt: str, image_url: str) -> Optional[str]:
+    grounded_prompt = _inject_visual_grounding(prompt, image_url)
+    if _is_backend_accessible_image(image_url):
+        vision_result = _call_deepseek_vision_chat(
+            grounded_prompt,
+            image_url,
+            model=settings.deepseek_vision_model,
+            temperature=settings.deepseek_vision_temperature,
+            max_tokens=settings.deepseek_vision_max_tokens,
+        )
+        if vision_result:
+            return vision_result
+
+    return _call_deepseek_chat(
+        grounded_prompt,
+        model=settings.deepseek_model,
+        temperature=settings.deepseek_text_temperature,
+        max_tokens=settings.deepseek_text_max_tokens,
+    )
+
+
 def _generate_polish_variants(
     original_content: str,
     image_url: str,
@@ -842,12 +1022,7 @@ def _generate_polish_variants(
 
     lite_prompt = _build_polish_prompt(original_content, image_url, bird_hint, style="lite")
     lite_meta = _call_with_quality_retry_meta(
-        lambda: _call_deepseek_chat(
-            lite_prompt,
-            model=settings.deepseek_model,
-            temperature=settings.deepseek_text_temperature,
-            max_tokens=settings.deepseek_text_max_tokens,
-        ),
+        lambda: _call_polish_model_with_optional_vision(lite_prompt, image_url),
         min_length=8,
         banned_templates=banned_templates,
     )
@@ -857,12 +1032,7 @@ def _generate_polish_variants(
 
     enhanced_prompt = _build_polish_prompt(original_content, image_url, bird_hint, style="enhanced")
     enhanced_meta = _call_with_quality_retry_meta(
-        lambda: _call_deepseek_chat(
-            enhanced_prompt,
-            model=settings.deepseek_model,
-            temperature=settings.deepseek_text_temperature,
-            max_tokens=settings.deepseek_text_max_tokens,
-        ),
+        lambda: _call_polish_model_with_optional_vision(enhanced_prompt, image_url),
         min_length=8,
         banned_templates=banned_templates,
     )
@@ -921,13 +1091,25 @@ def generate_post_copywriting(
     if normalized_mode == "polish" and not normalized_content:
         return None, (1001, "content is required when mode is polish.", 400)
 
-    bird_hint = _find_recent_bird_hint(current_user["id"], normalized_image_url)
+    bird_hint = _resolve_bird_hint_for_copywriting(current_user["id"], normalized_image_url)
+    vision_facts = _extract_vision_facts(normalized_image_url, bird_hint) if normalized_mode == "generate" else None
+    vision_facts_text = _format_vision_facts(vision_facts)
     if normalized_mode == "generate":
         prompt = _build_generate_prompt(normalized_image_url, bird_hint)
-        fallback_content = _fallback_generate_copy(bird_hint)
+        prompt = (
+            f"{prompt}\n"
+            "Use these structured visual facts as primary evidence when writing:\n"
+            f"{vision_facts_text}"
+        )
+        fallback_content = _fallback_generate_copy(
+            bird_hint,
+            visual_hint=_build_visual_grounding_hint(normalized_image_url),
+            vision_facts=vision_facts,
+        )
     else:
         prompt = _build_polish_prompt(normalized_content, normalized_image_url, bird_hint, style="lite")
         fallback_content = _fallback_polish_copy(normalized_content, bird_hint)
+    prompt = _inject_visual_grounding(prompt, normalized_image_url)
 
     ai_content = None
     ai_source = "fallback"
@@ -947,6 +1129,14 @@ def generate_post_copywriting(
                 "maxTokens": settings.deepseek_vision_max_tokens,
             },
         },
+        "visualHint": _build_visual_grounding_hint(normalized_image_url),
+        "birdHint": bird_hint or {},
+        "visionFacts": vision_facts or {},
+        "warnings": (
+            ["vision model may be text-only; set DEEPSEEK_VISION_MODEL to a vision-capable model"]
+            if (settings.deepseek_vision_model or "").strip() == (settings.deepseek_model or "").strip()
+            else []
+        ),
     }
     generate_banned_templates = [
         "今天给大家分享",
@@ -986,7 +1176,7 @@ def generate_post_copywriting(
                 }
             )
 
-    if not ai_content:
+    if normalized_mode != "generate" and not ai_content:
         min_length = 24 if normalized_mode == "generate" else 8
         text_meta = _call_with_quality_retry_meta(
             lambda: _call_deepseek_chat(
@@ -1022,7 +1212,12 @@ def generate_post_copywriting(
     extra_data = {}
     if normalized_mode == "generate":
         output_content = _ensure_generate_mentions_bird(output_content, bird_hint)
-        output_content = _normalize_generate_copy(output_content, bird_hint)
+        output_content = _normalize_generate_copy(
+            output_content,
+            bird_hint,
+            visual_hint=ai_meta["visualHint"],
+            vision_facts=vision_facts,
+        )
     else:
         variants, lite_source, polish_meta = _generate_polish_variants(
             original_content=normalized_content,
@@ -1210,3 +1405,4 @@ def create_comment(current_user: Optional[dict], post_id: int, content: str, par
             return {"commentId": comment.id}, None
     except SQLAlchemyError:
         return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
+

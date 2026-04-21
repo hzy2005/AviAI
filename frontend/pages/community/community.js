@@ -1,4 +1,5 @@
 const { posts, users } = require("../../src/api/index");
+const { baseUrl } = require("../../config/env");
 const { requireAuth } = require("../../utils/auth");
 const { formatDateTime, toFullImageUrl } = require("../../utils/format");
 
@@ -40,6 +41,15 @@ function isLocalTempImage(path) {
     value.startsWith("http://tmp/") ||
     value.startsWith("tmp/")
   );
+}
+
+function toApiImageUrl(url) {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  if (value.startsWith(`${baseUrl}/`)) {
+    return value.slice(baseUrl.length);
+  }
+  return value;
 }
 
 Page({
@@ -313,7 +323,7 @@ Page({
   async ensureDraftImageUploaded() {
     const current = this.data.draftImages[0] || "";
     if (!current || !isLocalTempImage(current)) {
-      return current;
+      return toApiImageUrl(current);
     }
 
     const uploadRes = await posts.uploadImage(current);
@@ -323,7 +333,7 @@ Page({
     }
 
     const nextImages = [...this.data.draftImages];
-    nextImages[0] = uploadedUrl;
+    nextImages[0] = toFullImageUrl(uploadedUrl);
     this.setData({ draftImages: nextImages });
     return uploadedUrl;
   },
@@ -331,7 +341,7 @@ Page({
   async ensureEditingImageUploaded() {
     const current = this.data.editingImages[0] || "";
     if (!current || !isLocalTempImage(current)) {
-      return current;
+      return toApiImageUrl(current);
     }
 
     const uploadRes = await posts.uploadImage(current);
@@ -341,7 +351,7 @@ Page({
     }
 
     const nextImages = [...this.data.editingImages];
-    nextImages[0] = uploadedUrl;
+    nextImages[0] = toFullImageUrl(uploadedUrl);
     this.setData({ editingImages: nextImages });
     return uploadedUrl;
   },
