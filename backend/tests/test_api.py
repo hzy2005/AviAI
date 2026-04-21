@@ -1,4 +1,4 @@
-import io
+﻿import io
 import sys
 import unittest
 import uuid
@@ -410,7 +410,7 @@ class ApiTestCase(unittest.TestCase):
         self.assertTrue(generate_body["data"]["content"])
         self.assertIn(generate_body["data"]["source"], {"deepseek_vision", "deepseek", "fallback"})
         generate_content = generate_body["data"]["content"]
-        sentences = [s for s in re.split(r"[。！？!?]+", generate_content) if s.strip()]
+        sentences = [s for s in re.split(r"[銆傦紒锛??]+", generate_content) if s.strip()]
         self.assertEqual(len(sentences), 3)
         self.assertGreaterEqual(len(generate_content), 50)
         self.assertLessEqual(len(generate_content), 90)
@@ -421,17 +421,25 @@ class ApiTestCase(unittest.TestCase):
             json={
                 "mode": "polish",
                 "imageUrl": "/uploads/ai-copy-source.jpg",
-                "content": "今天看到一只鸟，感觉很可爱",
+                "content": "浠婂ぉ鐪嬪埌涓€鍙笩锛屾劅瑙夊緢鍙埍",
             },
         )
         self.assertEqual(polish_response.status_code, 200)
+        polish_body = polish_response.json()
         polish_body = polish_response.json()
         self.assertEqual(polish_body["code"], 0)
         self.assertEqual(polish_body["data"]["mode"], "polish")
         self.assertTrue(polish_body["data"]["content"])
         self.assertIn(polish_body["data"]["source"], {"deepseek", "fallback"})
+        self.assertEqual(polish_body["data"]["defaultVariant"], "lite")
+        self.assertIn("lite", polish_body["data"])
+        self.assertIn("enhanced", polish_body["data"])
+        self.assertEqual(polish_body["data"]["content"], polish_body["data"]["lite"])
+        self.assertIn("sources", polish_body["data"])
+        self.assertIn(polish_body["data"]["sources"]["lite"], {"deepseek", "fallback"})
+        self.assertIn(polish_body["data"]["sources"]["enhanced"], {"deepseek", "fallback"})
         polished_content = polish_body["data"]["content"]
-        self.assertIn("鸟", polished_content)
+        self.assertIn("bird", polished_content.lower())
         self.assertNotIn("```", polished_content)
         self.assertNotIn("#", polished_content)
 
@@ -484,7 +492,7 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         body = response.json()
         self.assertEqual(body["code"], 1001)
-        self.assertEqual(body["msg"], "参数错误")
+        self.assertEqual(body["msg"], "鍙傛暟閿欒")
         self.assertIsNotNone(body["data"])
 
     def test_register_and_login(self):
@@ -702,12 +710,12 @@ class ApiTestCase(unittest.TestCase):
         create_post_response = self.client.post(
             "/api/v1/posts",
             headers=headers,
-            json={"content": "测试动态", "imageUrl": "/uploads/test.jpg"},
+            json={"content": "娴嬭瘯鍔ㄦ€?, "imageUrl": "/uploads/test.jpg"},
         )
         self.assertEqual(create_post_response.status_code, 201)
         post_id = create_post_response.json()["data"]["postId"]
 
-        list_response = self.client.get("/api/v1/posts?keyword=测试")
+        list_response = self.client.get("/api/v1/posts?keyword=娴嬭瘯")
         self.assertEqual(list_response.status_code, 200)
         self.assertGreaterEqual(list_response.json()["data"]["total"], 1)
 
@@ -718,7 +726,7 @@ class ApiTestCase(unittest.TestCase):
         update_response = self.client.put(
             f"/api/v1/posts/{post_id}",
             headers=headers,
-            json={"content": "更新后的动态", "imageUrl": "/uploads/updated.jpg"},
+            json={"content": "鏇存柊鍚庣殑鍔ㄦ€?, "imageUrl": "/uploads/updated.jpg"},
         )
         self.assertEqual(update_response.status_code, 200)
 
@@ -729,7 +737,7 @@ class ApiTestCase(unittest.TestCase):
         comment_response = self.client.post(
             f"/api/v1/posts/{post_id}/comments",
             headers=headers,
-            json={"content": "测试评论", "parentId": None},
+            json={"content": "娴嬭瘯璇勮", "parentId": None},
         )
         self.assertEqual(comment_response.status_code, 201)
 

@@ -451,14 +451,25 @@ def _build_generate_prompt(image_url: str, bird_hint: Optional[dict]) -> str:
     )
 
 
-def _build_polish_prompt(content: str, image_url: str, bird_hint: Optional[dict]) -> str:
+def _build_polish_prompt(
+    content: str,
+    image_url: str,
+    bird_hint: Optional[dict],
+    style: str = "lite",
+) -> str:
     bird_name = (bird_hint or {}).get("birdName") or "unknown bird"
+    style_rule = (
+        "Use light polish only: keep wording close to original."
+        if style == "lite"
+        else "Use enhanced polish: stronger rhythm and emotional tension, but still no new facts."
+    )
     return (
         "You are an assistant for a bird community app. "
         "Rewrite and polish the following Chinese post with strict meaning preservation. "
         "Rules: keep original facts unchanged, do not add new facts, people, time, place, or events; "
         "improve fluency, readability, and emotional tension; keep concise and natural style. "
         "Return plain text only. No explanation, no markdown, no hashtags, no bullets, no quotes. "
+        f"{style_rule} "
         "If species hint conflicts with the original text, trust the original text.\n"
         f"Species hint (reference only): {bird_name}\n"
         f"Image reference: {image_url}\n"
@@ -694,6 +705,34 @@ def _normalize_polish_copy(content: str, original_content: str) -> str:
 
     return normalized
 
+
+def _generate_polish_variants(
+    original_content: str,
+    image_url: str,
+    bird_hint: Optional[dict],
+) -> tuple[dict, str]:
+    fallback = _fallback_polish_copy(original_content, bird_hint)
+
+    lite_prompt = _build_polish_prompt(original_content, image_url, bird_hint, style="lite")
+    lite_ai = _call_deepseek_chat(lite_prompt)
+    lite = _normalize_polish_copy(lite_ai or fallback, original_content)
+    lite_source = "deepseek" if lite_ai else "fallback"
+
+    enhanced_prompt = _build_polish_prompt(original_content, image_url, bird_hint, style="enhanced")
+    enhanced_ai = _call_deepseek_chat(enhanced_prompt)
+    enhanced = _normalize_polish_copy(enhanced_ai or lite, original_content)
+    enhanced_source = "deepseek" if enhanced_ai else lite_source
+
+    return {
+        "lite": lite,
+        "enhanced": enhanced,
+        "defaultVariant": "lite",
+        "sources": {
+            "lite": lite_source,
+            "enhanced": enhanced_source,
+        },
+    }, lite_source
+
 def generate_post_copywriting(
     current_user: Optional[dict],
     mode: str,
@@ -719,7 +758,7 @@ def generate_post_copywriting(
         prompt = _build_generate_prompt(normalized_image_url, bird_hint)
         fallback_content = _fallback_generate_copy(bird_hint)
     else:
-        prompt = _build_polish_prompt(normalized_content, normalized_image_url, bird_hint)
+        prompt = _build_polish_prompt(normalized_content, normalized_image_url, bird_hint, style="lite")
         fallback_content = _fallback_polish_copy(normalized_content, bird_hint)
 
     ai_content = None
@@ -735,17 +774,28 @@ def generate_post_copywriting(
             ai_source = "deepseek"
 
     output_content = ai_content or fallback_content
+    extra_data = {}
     if normalized_mode == "generate":
         output_content = _ensure_generate_mentions_bird(output_content, bird_hint)
         output_content = _normalize_generate_copy(output_content, bird_hint)
     else:
-        output_content = _normalize_polish_copy(output_content, normalized_content)
+        variants, lite_source = _generate_polish_variants(
+            original_content=normalized_content,
+            image_url=normalized_image_url,
+            bird_hint=bird_hint,
+        )
+        output_content = variants["lite"]
+        ai_source = lite_source
+        extra_data.update(variants)
 
-    return {
+    result = {
         "mode": normalized_mode,
         "content": output_content,
         "source": ai_source,
-    }, None
+    }
+    if extra_data:
+        result.update(extra_data)
+    return result, None
 
 
 def list_posts(page: int, page_size: int, keyword: Optional[str] = None):
