@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com/v1"
     deepseek_model: str = "deepseek-chat"
     deepseek_vision_model: str = "deepseek-chat"
+    deepseek_text_temperature: float = 0.7
+    deepseek_text_max_tokens: int = 240
+    deepseek_vision_temperature: float = 0.7
+    deepseek_vision_max_tokens: int = 280
     deepseek_timeout_seconds: int = 15
 
     model_config = SettingsConfigDict(

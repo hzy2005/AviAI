@@ -4,6 +4,7 @@ import json
 import mimetypes
 from pathlib import Path
 import re
+import time
 from typing import Optional
 from urllib import error as urllib_error
 from urllib import request as urllib_request
@@ -477,7 +478,12 @@ def _build_polish_prompt(
     )
 
 
-def _call_deepseek_chat(prompt: str) -> Optional[str]:
+def _call_deepseek_chat(
+    prompt: str,
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
+) -> Optional[str]:
     api_key = (settings.deepseek_api_key or "").strip()
     if not api_key:
         return None
@@ -490,13 +496,13 @@ def _call_deepseek_chat(prompt: str) -> Optional[str]:
         f"{base_url}/chat/completions",
         data=json.dumps(
             {
-                "model": settings.deepseek_model,
+                "model": model or settings.deepseek_model,
                 "messages": [
                     {"role": "system", "content": "You are a helpful copywriting assistant."},
                     {"role": "user", "content": prompt},
                 ],
-                "temperature": 0.7,
-                "max_tokens": 240,
+                "temperature": temperature if temperature is not None else settings.deepseek_text_temperature,
+                "max_tokens": max_tokens if max_tokens is not None else settings.deepseek_text_max_tokens,
             }
         ).encode("utf-8"),
         method="POST",
@@ -545,7 +551,13 @@ def _resolve_image_input_for_vision(image_url: str) -> Optional[str]:
     return f"data:{mime};base64,{encoded}"
 
 
-def _call_deepseek_vision_chat(prompt: str, image_url: str) -> Optional[str]:
+def _call_deepseek_vision_chat(
+    prompt: str,
+    image_url: str,
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
+) -> Optional[str]:
     api_key = (settings.deepseek_api_key or "").strip()
     if not api_key:
         return None
@@ -562,7 +574,7 @@ def _call_deepseek_vision_chat(prompt: str, image_url: str) -> Optional[str]:
         f"{base_url}/chat/completions",
         data=json.dumps(
             {
-                "model": settings.deepseek_vision_model or settings.deepseek_model,
+                "model": model or settings.deepseek_vision_model or settings.deepseek_model,
                 "messages": [
                     {"role": "system", "content": "You are a helpful bird caption assistant."},
                     {
@@ -573,8 +585,14 @@ def _call_deepseek_vision_chat(prompt: str, image_url: str) -> Optional[str]:
                         ],
                     },
                 ],
-                "temperature": 0.7,
-                "max_tokens": 280,
+                "temperature": (
+                    temperature
+                    if temperature is not None
+                    else settings.deepseek_vision_temperature
+                ),
+                "max_tokens": (
+                    max_tokens if max_tokens is not None else settings.deepseek_vision_max_tokens
+                ),
             }
         ).encode("utf-8"),
         method="POST",
@@ -644,6 +662,35 @@ def _call_with_quality_retry(
     if _is_quality_passed(second, min_length=min_length, banned_templates=banned_templates):
         return second
     return None
+
+
+def _call_with_quality_retry_meta(
+    call_fn,
+    min_length: int,
+    banned_templates: list[str],
+    max_attempts: int = 2,
+) -> dict:
+    started = time.perf_counter()
+    attempts = 0
+    passed = False
+    content = None
+
+    for _ in range(max_attempts):
+        attempts += 1
+        candidate = call_fn()
+        if _is_quality_passed(candidate, min_length=min_length, banned_templates=banned_templates):
+            content = candidate
+            passed = True
+            break
+
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+    return {
+        "content": content if passed else None,
+        "attempts": attempts,
+        "retryCount": max(0, attempts - 1),
+        "fallback": not passed,
+        "elapsedMs": elapsed_ms,
+    }
 def _fallback_generate_copy(bird_hint: Optional[dict]) -> str:
     bird_name = (bird_hint or {}).get("birdName")
     confidence = float((bird_hint or {}).get("confidence") or 0.0)
@@ -758,7 +805,7 @@ def _generate_polish_variants(
     original_content: str,
     image_url: str,
     bird_hint: Optional[dict],
-) -> tuple[dict, str]:
+) -> tuple[dict, str, dict]:
     fallback = _fallback_polish_copy(original_content, bird_hint)
     banned_templates = [
         "作为AI",
@@ -769,24 +816,36 @@ def _generate_polish_variants(
     ]
 
     lite_prompt = _build_polish_prompt(original_content, image_url, bird_hint, style="lite")
-    lite_ai = _call_with_quality_retry(
-        lambda: _call_deepseek_chat(lite_prompt),
+    lite_meta = _call_with_quality_retry_meta(
+        lambda: _call_deepseek_chat(
+            lite_prompt,
+            model=settings.deepseek_model,
+            temperature=settings.deepseek_text_temperature,
+            max_tokens=settings.deepseek_text_max_tokens,
+        ),
         min_length=8,
         banned_templates=banned_templates,
     )
+    lite_ai = lite_meta["content"]
     lite = _normalize_polish_copy(lite_ai or fallback, original_content)
     lite_source = "deepseek" if lite_ai else "fallback"
 
     enhanced_prompt = _build_polish_prompt(original_content, image_url, bird_hint, style="enhanced")
-    enhanced_ai = _call_with_quality_retry(
-        lambda: _call_deepseek_chat(enhanced_prompt),
+    enhanced_meta = _call_with_quality_retry_meta(
+        lambda: _call_deepseek_chat(
+            enhanced_prompt,
+            model=settings.deepseek_model,
+            temperature=settings.deepseek_text_temperature,
+            max_tokens=settings.deepseek_text_max_tokens,
+        ),
         min_length=8,
         banned_templates=banned_templates,
     )
+    enhanced_ai = enhanced_meta["content"]
     enhanced = _normalize_polish_copy(enhanced_ai or lite, original_content)
     enhanced_source = "deepseek" if enhanced_ai else lite_source
 
-    return {
+    variants = {
         "lite": lite,
         "enhanced": enhanced,
         "defaultVariant": "lite",
@@ -794,7 +853,22 @@ def _generate_polish_variants(
             "lite": lite_source,
             "enhanced": enhanced_source,
         },
-    }, lite_source
+    }
+    meta = {
+        "lite": {
+            "model": settings.deepseek_model,
+            "elapsedMs": lite_meta["elapsedMs"],
+            "retryCount": lite_meta["retryCount"],
+            "fallback": lite_meta["fallback"],
+        },
+        "enhanced": {
+            "model": settings.deepseek_model,
+            "elapsedMs": enhanced_meta["elapsedMs"],
+            "retryCount": enhanced_meta["retryCount"],
+            "fallback": enhanced_meta["fallback"],
+        },
+    }
+    return variants, lite_source, meta
 
 def generate_post_copywriting(
     current_user: Optional[dict],
@@ -826,6 +900,23 @@ def generate_post_copywriting(
 
     ai_content = None
     ai_source = "fallback"
+    ai_meta = {
+        "mode": normalized_mode,
+        "model": "fallback",
+        "elapsedMs": 0,
+        "retryCount": 0,
+        "fallback": True,
+        "params": {
+            "text": {
+                "temperature": settings.deepseek_text_temperature,
+                "maxTokens": settings.deepseek_text_max_tokens,
+            },
+            "vision": {
+                "temperature": settings.deepseek_vision_temperature,
+                "maxTokens": settings.deepseek_vision_max_tokens,
+            },
+        },
+    }
     generate_banned_templates = [
         "今天给大家分享",
         "这张图真的太美了",
@@ -834,23 +925,67 @@ def generate_post_copywriting(
         "仅供参考",
     ]
     if normalized_mode == "generate":
-        ai_content = _call_with_quality_retry(
-            lambda: _call_deepseek_vision_chat(prompt, normalized_image_url),
+        vision_meta = _call_with_quality_retry_meta(
+            lambda: _call_deepseek_vision_chat(
+                prompt,
+                normalized_image_url,
+                model=settings.deepseek_vision_model,
+                temperature=settings.deepseek_vision_temperature,
+                max_tokens=settings.deepseek_vision_max_tokens,
+            ),
             min_length=24,
             banned_templates=generate_banned_templates,
         )
+        ai_content = vision_meta["content"]
         if ai_content:
             ai_source = "deepseek_vision"
+            ai_meta.update(
+                {
+                    "model": settings.deepseek_vision_model,
+                    "elapsedMs": vision_meta["elapsedMs"],
+                    "retryCount": vision_meta["retryCount"],
+                    "fallback": False,
+                }
+            )
+        else:
+            ai_meta.update(
+                {
+                    "elapsedMs": vision_meta["elapsedMs"],
+                    "retryCount": vision_meta["retryCount"],
+                }
+            )
 
     if not ai_content:
         min_length = 24 if normalized_mode == "generate" else 8
-        ai_content = _call_with_quality_retry(
-            lambda: _call_deepseek_chat(prompt),
+        text_meta = _call_with_quality_retry_meta(
+            lambda: _call_deepseek_chat(
+                prompt,
+                model=settings.deepseek_model,
+                temperature=settings.deepseek_text_temperature,
+                max_tokens=settings.deepseek_text_max_tokens,
+            ),
             min_length=min_length,
             banned_templates=generate_banned_templates if normalized_mode == "generate" else [],
         )
+        ai_content = text_meta["content"]
         if ai_content:
             ai_source = "deepseek"
+            ai_meta.update(
+                {
+                    "model": settings.deepseek_model,
+                    "elapsedMs": ai_meta["elapsedMs"] + text_meta["elapsedMs"],
+                    "retryCount": ai_meta["retryCount"] + text_meta["retryCount"],
+                    "fallback": False,
+                }
+            )
+        else:
+            ai_meta.update(
+                {
+                    "elapsedMs": ai_meta["elapsedMs"] + text_meta["elapsedMs"],
+                    "retryCount": ai_meta["retryCount"] + text_meta["retryCount"],
+                    "fallback": True,
+                }
+            )
 
     output_content = ai_content or fallback_content
     extra_data = {}
@@ -858,7 +993,7 @@ def generate_post_copywriting(
         output_content = _ensure_generate_mentions_bird(output_content, bird_hint)
         output_content = _normalize_generate_copy(output_content, bird_hint)
     else:
-        variants, lite_source = _generate_polish_variants(
+        variants, lite_source, polish_meta = _generate_polish_variants(
             original_content=normalized_content,
             image_url=normalized_image_url,
             bird_hint=bird_hint,
@@ -866,11 +1001,21 @@ def generate_post_copywriting(
         output_content = variants["lite"]
         ai_source = lite_source
         extra_data.update(variants)
+        ai_meta.update(
+            {
+                "model": settings.deepseek_model if lite_source == "deepseek" else "fallback",
+                "elapsedMs": polish_meta["lite"]["elapsedMs"] + polish_meta["enhanced"]["elapsedMs"],
+                "retryCount": polish_meta["lite"]["retryCount"] + polish_meta["enhanced"]["retryCount"],
+                "fallback": lite_source == "fallback",
+                "variants": polish_meta,
+            }
+        )
 
     result = {
         "mode": normalized_mode,
         "content": output_content,
         "source": ai_source,
+        "aiMeta": ai_meta,
     }
     if extra_data:
         result.update(extra_data)
