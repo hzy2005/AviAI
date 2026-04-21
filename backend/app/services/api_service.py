@@ -3,6 +3,7 @@ import base64
 import json
 import mimetypes
 from pathlib import Path
+import re
 from typing import Optional
 from urllib import error as urllib_error
 from urllib import request as urllib_request
@@ -438,10 +439,12 @@ def _build_generate_prompt(image_url: str, bird_hint: Optional[dict]) -> str:
     confidence_percent = round(confidence * 100, 1)
     return (
         "You are an assistant for a bird community app. "
-        "Write one concise Chinese social post caption with 2-4 sentences. "
-        "Style should be warm, natural, and suitable for sharing. "
-        "Do not use markdown. Do not include hashtags. "
-        "If species hint is available, explicitly mention the species name in the caption. "
+        "Write Chinese copy in exactly 3 sentences with this fixed order: scene, observation, feeling. "
+        "Total length must be 50-90 Chinese characters. "
+        "Do not use markdown, hashtags, emojis, or list format. "
+        "Avoid vague cliches such as '太美了', '好可爱', '真的很治愈', '氛围感拉满'. "
+        "Use concrete visual details from the image including color, posture, and surrounding scene. "
+        "If species hint is available, naturally mention it. "
         f"Species hint: {bird_name}. "
         f"Recognition confidence: {confidence_percent}%. "
         f"Image reference: {image_url}."
@@ -598,6 +601,53 @@ def _fallback_generate_copy(bird_hint: Optional[dict]) -> str:
     )
 
 
+def _normalize_generate_copy(content: str, bird_hint: Optional[dict]) -> str:
+    fallback_sentences = re.split(r"[。！？!?]+", _fallback_generate_copy(bird_hint))
+    fallback_sentences = [s.strip() for s in fallback_sentences if s.strip()]
+
+    normalized = (content or "").strip()
+    normalized = re.sub(r"[#*_`]", "", normalized)
+    normalized = normalized.replace("\n", "")
+
+    banned_phrases = [
+        "太美了",
+        "好可爱",
+        "真的很治愈",
+        "氛围感拉满",
+    ]
+    for phrase in banned_phrases:
+        normalized = normalized.replace(phrase, "")
+
+    sentences = re.split(r"[。！？!?]+", normalized)
+    sentences = [s.strip(" ，,;；:：") for s in sentences if s.strip(" ，,;；:：")]
+    if not sentences:
+        sentences = fallback_sentences[:]
+
+    while len(sentences) < 3:
+        idx = len(sentences)
+        fallback_sentence = fallback_sentences[idx] if idx < len(fallback_sentences) else "画面细节很有层次"
+        sentences.append(fallback_sentence)
+
+    sentences = sentences[:3]
+    text = "。".join(sentences) + "。"
+
+    min_len = 50
+    max_len = 90
+    if len(text) < min_len:
+        for extra in fallback_sentences:
+            if extra and extra not in text:
+                text = f"{text[:-1]}，{extra}。"
+            if len(text) >= min_len:
+                break
+    if len(text) > max_len:
+        third = sentences[2]
+        max_third_len = max(6, max_len - (len(sentences[0]) + len(sentences[1]) + 3))
+        third = third[:max_third_len].rstrip(" ，,;；:：")
+        text = f"{sentences[0]}。{sentences[1]}。{third}。"
+
+    return text
+
+
 def _ensure_generate_mentions_bird(content: str, bird_hint: Optional[dict]) -> str:
     bird_name = (bird_hint or {}).get("birdName")
     if not bird_name:
@@ -611,8 +661,7 @@ def _ensure_generate_mentions_bird(content: str, bird_hint: Optional[dict]) -> s
 
     confidence = float((bird_hint or {}).get("confidence") or 0.0)
     confidence_percent = round(confidence * 100, 1)
-    return f"{normalized} 主角大概率是{bird_name}（识别置信度{confidence_percent}%）。"
-
+    return f"{normalized}，主角大概率是{bird_name}（识别置信度{confidence_percent}%）"
 
 def _fallback_polish_copy(content: str, bird_hint: Optional[dict]) -> str:
     polished = " ".join(content.split()).strip()
@@ -670,6 +719,7 @@ def generate_post_copywriting(
     output_content = ai_content or fallback_content
     if normalized_mode == "generate":
         output_content = _ensure_generate_mentions_bird(output_content, bird_hint)
+        output_content = _normalize_generate_copy(output_content, bird_hint)
 
     return {
         "mode": normalized_mode,

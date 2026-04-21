@@ -3,6 +3,7 @@ import sys
 import unittest
 import uuid
 import base64
+import re
 from pathlib import Path
 
 CURRENT_FILE = Path(__file__).resolve()
@@ -408,6 +409,11 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(generate_body["data"]["mode"], "generate")
         self.assertTrue(generate_body["data"]["content"])
         self.assertIn(generate_body["data"]["source"], {"deepseek_vision", "deepseek", "fallback"})
+        generate_content = generate_body["data"]["content"]
+        sentences = [s for s in re.split(r"[。！？!?]+", generate_content) if s.strip()]
+        self.assertEqual(len(sentences), 3)
+        self.assertGreaterEqual(len(generate_content), 50)
+        self.assertLessEqual(len(generate_content), 90)
 
         polish_response = self.client.post(
             "/api/v1/posts/ai-copywriting",
