@@ -44,7 +44,7 @@
 
 ## PR 链接
 
-- PR #X: https://github.com/hzy2005/AviAI/pull/26
+- PR #X: https://github.com/hzy2005/AviAI/pull/28
 
 ## 遇到的问题和解决
 
