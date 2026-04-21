@@ -596,6 +596,54 @@ def _call_deepseek_vision_chat(prompt: str, image_url: str) -> Optional[str]:
         return content or None
     except (urllib_error.HTTPError, urllib_error.URLError, TimeoutError, json.JSONDecodeError):
         return None
+
+
+def _has_repeated_fragment(text: str) -> bool:
+    if not text:
+        return False
+    # Repeated short phrase like "好看好看好看" or duplicated chunks.
+    if re.search(r"(.{2,8})\1{2,}", text):
+        return True
+
+    tokens = re.findall(r"[A-Za-z0-9]+|[\u4e00-\u9fff]{1,2}", text)
+    if len(tokens) < 8:
+        return False
+
+    counts = {}
+    for token in tokens:
+        counts[token] = counts.get(token, 0) + 1
+    return any(v >= 5 for v in counts.values())
+
+
+def _is_quality_passed(text: Optional[str], min_length: int, banned_templates: list[str]) -> bool:
+    normalized = (text or "").strip()
+    if not normalized:
+        return False
+    if len(normalized) < min_length:
+        return False
+    if _has_repeated_fragment(normalized):
+        return False
+
+    lowered = normalized.lower()
+    for phrase in banned_templates:
+        if phrase and phrase.lower() in lowered:
+            return False
+    return True
+
+
+def _call_with_quality_retry(
+    call_fn,
+    min_length: int,
+    banned_templates: list[str],
+) -> Optional[str]:
+    first = call_fn()
+    if _is_quality_passed(first, min_length=min_length, banned_templates=banned_templates):
+        return first
+
+    second = call_fn()
+    if _is_quality_passed(second, min_length=min_length, banned_templates=banned_templates):
+        return second
+    return None
 def _fallback_generate_copy(bird_hint: Optional[dict]) -> str:
     bird_name = (bird_hint or {}).get("birdName")
     confidence = float((bird_hint or {}).get("confidence") or 0.0)
@@ -712,14 +760,29 @@ def _generate_polish_variants(
     bird_hint: Optional[dict],
 ) -> tuple[dict, str]:
     fallback = _fallback_polish_copy(original_content, bird_hint)
+    banned_templates = [
+        "作为AI",
+        "仅供参考",
+        "希望这段文案",
+        "大家快来看看",
+        "今天分享给大家",
+    ]
 
     lite_prompt = _build_polish_prompt(original_content, image_url, bird_hint, style="lite")
-    lite_ai = _call_deepseek_chat(lite_prompt)
+    lite_ai = _call_with_quality_retry(
+        lambda: _call_deepseek_chat(lite_prompt),
+        min_length=8,
+        banned_templates=banned_templates,
+    )
     lite = _normalize_polish_copy(lite_ai or fallback, original_content)
     lite_source = "deepseek" if lite_ai else "fallback"
 
     enhanced_prompt = _build_polish_prompt(original_content, image_url, bird_hint, style="enhanced")
-    enhanced_ai = _call_deepseek_chat(enhanced_prompt)
+    enhanced_ai = _call_with_quality_retry(
+        lambda: _call_deepseek_chat(enhanced_prompt),
+        min_length=8,
+        banned_templates=banned_templates,
+    )
     enhanced = _normalize_polish_copy(enhanced_ai or lite, original_content)
     enhanced_source = "deepseek" if enhanced_ai else lite_source
 
@@ -763,13 +826,29 @@ def generate_post_copywriting(
 
     ai_content = None
     ai_source = "fallback"
+    generate_banned_templates = [
+        "今天给大家分享",
+        "这张图真的太美了",
+        "希望大家喜欢",
+        "作为AI",
+        "仅供参考",
+    ]
     if normalized_mode == "generate":
-        ai_content = _call_deepseek_vision_chat(prompt, normalized_image_url)
+        ai_content = _call_with_quality_retry(
+            lambda: _call_deepseek_vision_chat(prompt, normalized_image_url),
+            min_length=24,
+            banned_templates=generate_banned_templates,
+        )
         if ai_content:
             ai_source = "deepseek_vision"
 
     if not ai_content:
-        ai_content = _call_deepseek_chat(prompt)
+        min_length = 24 if normalized_mode == "generate" else 8
+        ai_content = _call_with_quality_retry(
+            lambda: _call_deepseek_chat(prompt),
+            min_length=min_length,
+            banned_templates=generate_banned_templates if normalized_mode == "generate" else [],
+        )
         if ai_content:
             ai_source = "deepseek"
 

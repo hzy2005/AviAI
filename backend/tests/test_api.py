@@ -4,6 +4,7 @@ import unittest
 import uuid
 import base64
 import re
+from unittest.mock import patch
 from pathlib import Path
 
 CURRENT_FILE = Path(__file__).resolve()
@@ -477,6 +478,21 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(generate_response.status_code, 200)
         generate_content = generate_response.json()["data"]["content"]
         self.assertIn(bird_name, generate_content)
+
+    def test_ai_quality_retry_uses_second_attempt_when_first_is_low_quality(self):
+        from app.services import api_service
+
+        with patch.object(
+            api_service,
+            "_call_deepseek_chat",
+            side_effect=["今天给大家分享，希望大家喜欢。", "清晨枝头的羽色在逆光里更清晰，停驻姿态很稳。"],
+        ):
+            result = api_service._call_with_quality_retry(
+                lambda: api_service._call_deepseek_chat("prompt"),
+                min_length=12,
+                banned_templates=["今天给大家分享", "希望大家喜欢"],
+            )
+        self.assertEqual(result, "清晨枝头的羽色在逆光里更清晰，停驻姿态很稳。")
 
     def test_health(self):
         response = self.client.get("/api/v1/health")
