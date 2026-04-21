@@ -72,9 +72,12 @@
           <view wx:if="{{!draftImages.length}}" class="draft-placeholder">No image selected</view>
         </view>
 
-        <view class="modal-actions">
-          <button class="small-btn" bindtap="onChooseDraftImages">Add Photos</button>
-          <button class="small-btn primary" loading="{{submitting}}" bindtap="onSubmitPost">Publish</button>
+        <view class="create-actions-top">
+          <button class="small-btn create-action-btn" bindtap="onChooseDraftImages">Add Photos</button>
+          <button class="small-btn create-action-btn ai-btn" loading="{{aiCopyLoading}}" bindtap="onGenerateAICopy">{{draftAiButtonText}}</button>
+        </view>
+        <view class="create-actions-bottom">
+          <button class="small-btn primary create-publish-btn" loading="{{submitting}}" bindtap="onSubmitPost">Publish</button>
         </view>
       </view>
 

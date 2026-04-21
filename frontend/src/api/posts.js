@@ -1,10 +1,46 @@
 const { apiClient } = require("./client");
+const { baseUrl } = require("../../config/env");
 
 function create(data) {
   return apiClient({
     url: "/api/v1/posts",
     method: "POST",
     data
+  });
+}
+
+function aiCopywriting(data) {
+  return apiClient({
+    url: "/api/v1/posts/ai-copywriting",
+    method: "POST",
+    data
+  });
+}
+
+function uploadImage(filePath) {
+  const token = wx.getStorageSync("accessToken");
+
+  return new Promise((resolve, reject) => {
+    wx.uploadFile({
+      url: `${baseUrl}/api/v1/posts/upload-image`,
+      filePath,
+      name: "image",
+      header: token ? { Authorization: `Bearer ${token}` } : {},
+      success: (res) => {
+        let data = {};
+        try {
+          data = JSON.parse(res.data || "{}");
+        } catch (error) {
+          data = {};
+        }
+        if (res.statusCode >= 200 && res.statusCode < 300 && data.code === 0) {
+          resolve(data);
+          return;
+        }
+        reject(data);
+      },
+      fail: reject
+    });
   });
 }
 
@@ -54,6 +90,8 @@ function comment(postId, data) {
 
 module.exports = {
   create,
+  aiCopywriting,
+  uploadImage,
   list,
   detail,
   update,

@@ -1,4 +1,5 @@
 const { posts, users } = require("../../src/api/index");
+const { baseUrl } = require("../../config/env");
 const { requireAuth } = require("../../utils/auth");
 const { formatDateTime, toFullImageUrl } = require("../../utils/format");
 
@@ -28,6 +29,29 @@ function getDisplayTitle(content) {
   return text.length > 26 ? `${text.slice(0, 26)}...` : text;
 }
 
+function getDraftAiButtonText(content) {
+  return String(content || "").trim() ? "AI Polish" : "AI Generate";
+}
+
+function isLocalTempImage(path) {
+  const value = String(path || "").trim();
+  if (!value) return false;
+  return (
+    value.startsWith("wxfile://") ||
+    value.startsWith("http://tmp/") ||
+    value.startsWith("tmp/")
+  );
+}
+
+function toApiImageUrl(url) {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  if (value.startsWith(`${baseUrl}/`)) {
+    return value.slice(baseUrl.length);
+  }
+  return value;
+}
+
 Page({
   data: {
     posts: [],
@@ -47,6 +71,8 @@ Page({
     showMask: false,
     draftContent: "",
     draftImages: [],
+    draftAiButtonText: "AI Generate",
+    aiCopyLoading: false,
     submitting: false,
     editingPostId: null,
     editingContent: "",
@@ -227,7 +253,8 @@ Page({
       showCreateModal: true,
       showManageModal: false,
       showSearch: false,
-      showMask: true
+      showMask: true,
+      draftAiButtonText: getDraftAiButtonText(this.data.draftContent)
     });
   },
 
@@ -250,6 +277,7 @@ Page({
       showCreateModal: false,
       showManageModal: false,
       showMask: false,
+      aiCopyLoading: false,
       editingPostId: null,
       editingContent: "",
       editingImages: []
@@ -259,7 +287,11 @@ Page({
   onStopBubble() {},
 
   onDraftInput(event) {
-    this.setData({ draftContent: event.detail.value });
+    const draftContent = event.detail.value;
+    this.setData({
+      draftContent,
+      draftAiButtonText: getDraftAiButtonText(draftContent)
+    });
   },
 
   async onChooseDraftImages() {
@@ -288,6 +320,77 @@ Page({
     this.setData({ draftImages: next });
   },
 
+  async ensureDraftImageUploaded() {
+    const current = this.data.draftImages[0] || "";
+    if (!current || !isLocalTempImage(current)) {
+      return toApiImageUrl(current);
+    }
+
+    const uploadRes = await posts.uploadImage(current);
+    const uploadedUrl = (uploadRes.data && uploadRes.data.imageUrl) || "";
+    if (!uploadedUrl) {
+      throw new Error("Image upload failed");
+    }
+
+    const nextImages = [...this.data.draftImages];
+    nextImages[0] = toFullImageUrl(uploadedUrl);
+    this.setData({ draftImages: nextImages });
+    return uploadedUrl;
+  },
+
+  async ensureEditingImageUploaded() {
+    const current = this.data.editingImages[0] || "";
+    if (!current || !isLocalTempImage(current)) {
+      return toApiImageUrl(current);
+    }
+
+    const uploadRes = await posts.uploadImage(current);
+    const uploadedUrl = (uploadRes.data && uploadRes.data.imageUrl) || "";
+    if (!uploadedUrl) {
+      throw new Error("Image upload failed");
+    }
+
+    const nextImages = [...this.data.editingImages];
+    nextImages[0] = toFullImageUrl(uploadedUrl);
+    this.setData({ editingImages: nextImages });
+    return uploadedUrl;
+  },
+
+  async onGenerateAICopy() {
+    if (!requireAuth()) return;
+    const content = this.data.draftContent.trim();
+    const firstImage = this.data.draftImages[0] || "";
+    if (!firstImage) {
+      wx.showToast({ title: "Please add a photo first", icon: "none" });
+      return;
+    }
+
+    const mode = content ? "polish" : "generate";
+
+    try {
+      this.setData({ aiCopyLoading: true });
+      const imageUrl = await this.ensureDraftImageUploaded();
+      const res = await posts.aiCopywriting({
+        mode,
+        imageUrl,
+        content
+      });
+      const nextContent = (res.data && res.data.content) || "";
+      this.setData({
+        draftContent: nextContent,
+        draftAiButtonText: getDraftAiButtonText(nextContent)
+      });
+      wx.showToast({
+        title: mode === "generate" ? "文案已生成" : "文案已润色",
+        icon: "success"
+      });
+    } catch (error) {
+      wx.showToast({ title: error.message || "AI copy failed", icon: "none" });
+    } finally {
+      this.setData({ aiCopyLoading: false });
+    }
+  },
+
   async onSubmitPost() {
     if (!requireAuth()) return;
 
@@ -299,14 +402,17 @@ Page({
 
     try {
       this.setData({ submitting: true });
+      const imageUrl = await this.ensureDraftImageUploaded();
       await posts.create({
         content,
-        imageUrl: this.data.draftImages[0] || null
+        imageUrl: imageUrl || null
       });
       wx.showToast({ title: "Posted", icon: "success" });
       this.setData({
         draftContent: "",
         draftImages: [],
+        draftAiButtonText: "AI Generate",
+        aiCopyLoading: false,
         showCreateModal: false,
         showMask: false
       });
@@ -376,9 +482,10 @@ Page({
     }
 
     try {
+      const imageUrl = await this.ensureEditingImageUploaded();
       await posts.update(postId, {
         content,
-        imageUrl: this.data.editingImages[0] || null
+        imageUrl: imageUrl || null
       });
       wx.showToast({ title: "Updated", icon: "success" });
       this.setData({ editingPostId: null, editingContent: "", editingImages: [] });

@@ -412,6 +412,35 @@ function getMockResponse({ url, method = "GET", data, token }) {
     return ok({ postId });
   }
 
+  if (path === "/api/v1/posts/ai-copywriting" && normalizedMethod === "POST") {
+    const authError = requireTokenOrFail(token);
+    if (authError) {
+      return authError;
+    }
+
+    const mode = String((data && data.mode) || "").trim();
+    const imageUrl = String((data && data.imageUrl) || "").trim();
+    const content = String((data && data.content) || "").trim();
+
+    if (!imageUrl || (mode !== "generate" && mode !== "polish")) {
+      return fail(1001, "参数错误");
+    }
+
+    if (mode === "polish" && !content) {
+      return fail(1001, "参数错误");
+    }
+
+    const generatedContent = mode === "generate"
+      ? "今天记录下一次很惊喜的观鸟瞬间，画面里的小鸟状态很自然，羽色和姿态都特别吸引人，忍不住想和大家分享这份遇见。"
+      : `${content.replace(/[。！!]*$/, "")}，画面感和氛围都很不错，特别想把这次观鸟的小惊喜分享给大家。`;
+
+    return ok({
+      mode,
+      content: generatedContent,
+      source: "deepseek"
+    });
+  }
+
   const detailMatch = path.match(/^\/api\/v1\/posts\/(\d+)$/);
   if (detailMatch && normalizedMethod === "GET") {
     const postId = Number(detailMatch[1]);

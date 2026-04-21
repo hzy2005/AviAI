@@ -1,9 +1,15 @@
-from datetime import datetime, timezone
+﻿from datetime import datetime, timezone
+import base64
+import json
+import mimetypes
 from pathlib import Path
+import re
+import time
 from typing import Optional
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 from uuid import uuid4
 import threading
-
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from PIL import Image, UnidentifiedImageError
@@ -12,6 +18,7 @@ import torch.nn.functional as F
 from torchvision.models import ResNet18_Weights, resnet18
 
 from app.core.auth import create_access_token, decode_access_token, hash_password, verify_password
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.bird_record import BirdRecord
 from app.models.comment import Comment
@@ -121,9 +128,9 @@ def register_user(username: str, email: str, password: str):
     try:
         with SessionLocal() as db:
             if db.scalar(select(User).where(User.email == email)):
-                return None, (1009, "邮箱已注册", 409)
+                return None, (1009, "Email already registered", 409)
             if db.scalar(select(User).where(User.username == username)):
-                return None, (1009, "用户名已存在", 409)
+                return None, (1009, "Username already registered", 409)
 
             user = User(
                 username=username,
@@ -136,7 +143,7 @@ def register_user(username: str, email: str, password: str):
             db.refresh(user)
             return {"userId": user.id}, None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "Database error", 500)
 
 
 def login_user(email: str, password: str):
@@ -144,7 +151,7 @@ def login_user(email: str, password: str):
         with SessionLocal() as db:
             user = db.scalar(select(User).where(User.email == email))
             if not user or not verify_password(password, user.password_hash):
-                return None, (1002, "邮箱或密码错误", 401)
+                return None, (1002, "Invalid email or password", 401)
 
             user_dict = _serialize_user_model(user)
             return {
@@ -152,7 +159,7 @@ def login_user(email: str, password: str):
                 "user": serialize_user_brief(user_dict),
             }, None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "Database error", 500)
 
 
 def logout_user():
@@ -265,13 +272,13 @@ def recognize_bird_for_user(
     if not current_user:
         return None, (1002, "未登录或 Token 无效", 401)
     if not filename:
-        return None, (1006, "上传文件不合法", 400)
+        return None, (1006, "Invalid upload file.", 400)
     if not file_bytes:
-        return None, (1006, "上传文件不合法", 400)
+        return None, (1006, "Invalid upload file.", 400)
 
     suffix = Path(filename).suffix.lower()
     if suffix not in ALLOWED_IMAGE_EXTENSIONS:
-        return None, (1006, "上传文件不合法", 400)
+        return None, (1006, "Invalid upload file.", 400)
 
     image_url = _save_upload_file(filename, file_bytes)
     saved_file_path = UPLOADS_DIR / Path(image_url).name
@@ -280,7 +287,7 @@ def recognize_bird_for_user(
     except (UnidentifiedImageError, OSError):
         if saved_file_path.exists():
             saved_file_path.unlink(missing_ok=True)
-        return None, (1006, "上传文件不合法", 400)
+        return None, (1006, "Invalid upload file.", 400)
 
     try:
         with SessionLocal() as db:
@@ -336,9 +343,9 @@ def get_bird_record_detail(current_user: Optional[dict], record_id: int):
         with SessionLocal() as db:
             record = db.get(BirdRecord, record_id)
             if not record:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
             if record.user_id != current_user["id"]:
-                return None, (1003, "无权限", 403)
+                return None, (1003, "Forbidden.", 403)
             return _serialize_bird_record_item(record), None
     except SQLAlchemyError:
         return None, (1005, "服务内部错误", 500)
@@ -352,9 +359,9 @@ def update_bird_record(current_user: Optional[dict], record_id: int, bird_name: 
         with SessionLocal() as db:
             record = db.get(BirdRecord, record_id)
             if not record:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
             if record.user_id != current_user["id"]:
-                return None, (1003, "无权限", 403)
+                return None, (1003, "Forbidden.", 403)
             record.bird_name = bird_name.strip()
             db.commit()
             db.refresh(record)
@@ -371,9 +378,9 @@ def delete_bird_record(current_user: Optional[dict], record_id: int):
         with SessionLocal() as db:
             record = db.get(BirdRecord, record_id)
             if not record:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
             if record.user_id != current_user["id"]:
-                return None, (1003, "无权限", 403)
+                return None, (1003, "Forbidden.", 403)
             db.delete(record)
             db.commit()
             return {"recordId": record_id, "deleted": True}, None
@@ -400,6 +407,897 @@ def create_post(current_user: Optional[dict], content: str, image_url: Optional[
             return {"postId": post.id}, None
     except SQLAlchemyError:
         return None, (1005, "服务内部错误", 500)
+
+def upload_post_image(
+    current_user: Optional[dict],
+    filename: Optional[str],
+    file_bytes: Optional[bytes],
+):
+    if not current_user:
+        return None, (1002, "Unauthorized", 401)
+    if not filename or not file_bytes:
+        return None, (1006, "Invalid upload file.", 400)
+
+    suffix = Path(filename).suffix.lower()
+    if suffix not in ALLOWED_IMAGE_EXTENSIONS:
+        return None, (1006, "Invalid upload file.", 400)
+
+    try:
+        image_url = _save_upload_file(filename, file_bytes)
+        return {"imageUrl": image_url}, None
+    except OSError:
+        return None, (1005, "Storage write failed", 500)
+
+
+def _find_recent_bird_hint(user_id: int, image_url: str) -> Optional[dict]:
+    normalized_image_url = (image_url or "").strip()
+    if not normalized_image_url:
+        return None
+
+    try:
+        with SessionLocal() as db:
+            record = db.scalar(
+                select(BirdRecord)
+                .where(
+                    BirdRecord.user_id == user_id,
+                    BirdRecord.image_url == normalized_image_url,
+                )
+                .order_by(BirdRecord.created_at.desc(), BirdRecord.id.desc())
+                .limit(1)
+            )
+            if not record:
+                return None
+            return {
+                "birdName": record.bird_name,
+                "confidence": float(record.confidence or 0.0),
+            }
+    except SQLAlchemyError:
+        return None
+
+
+def _resolve_local_image_path(image_url: str) -> Optional[Path]:
+    normalized = (image_url or "").strip()
+    if not normalized:
+        return None
+
+    if normalized.startswith("/uploads/"):
+        local_path = UPLOADS_DIR / Path(normalized).name
+        return local_path if local_path.exists() else None
+
+    candidate = Path(normalized)
+    if candidate.is_file():
+        return candidate
+    return None
+
+
+def _resolve_bird_hint_for_copywriting(user_id: int, image_url: str) -> Optional[dict]:
+    hint = _find_recent_bird_hint(user_id, image_url)
+    if hint:
+        return hint
+
+    local_path = _resolve_local_image_path(image_url)
+    if not local_path:
+        return None
+
+    try:
+        bird_name, confidence = _predict_bird_from_image(local_path)
+    except Exception:
+        return None
+
+    return {"birdName": bird_name, "confidence": float(confidence or 0.0)}
+
+
+def _extract_json_from_text(text: str) -> Optional[dict]:
+    raw = (text or "").strip()
+    if not raw:
+        return None
+
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start < 0 or end <= start:
+        return None
+
+    try:
+        parsed = json.loads(raw[start : end + 1])
+        return parsed if isinstance(parsed, dict) else None
+    except json.JSONDecodeError:
+        return None
+
+
+def _extract_vision_facts(image_url: str, bird_hint: Optional[dict]) -> Optional[dict]:
+    if not _is_backend_accessible_image(image_url):
+        return None
+
+    bird_name = (bird_hint or {}).get("birdName") or "unknown"
+    prompt = (
+        "Analyze this bird image and return STRICT JSON only. "
+        "No markdown, no explanation. "
+        'Fields: {"species":"", "mainColor":"", "location":"", "action":"", "pose":"", "confidence":0}. '
+        "location must be one of: tree_branch, water_edge, water_surface, sky, ground, unknown. "
+        "action should be short and objective, for example: standing, perching, looking_back, flying, swimming. "
+        f"Species hint: {bird_name}."
+    )
+    raw = _call_deepseek_vision_chat(
+        prompt,
+        image_url,
+        model=settings.deepseek_vision_model,
+        temperature=0.2,
+        max_tokens=180,
+    )
+    facts = _extract_json_from_text(raw or "")
+    if not facts:
+        return None
+
+    return {
+        "species": str(facts.get("species", "")).strip(),
+        "mainColor": str(facts.get("mainColor", "")).strip(),
+        "location": str(facts.get("location", "")).strip(),
+        "action": str(facts.get("action", "")).strip(),
+        "pose": str(facts.get("pose", "")).strip(),
+        "confidence": float(facts.get("confidence") or 0.0),
+    }
+
+
+def _format_vision_facts(facts: Optional[dict]) -> str:
+    if not facts:
+        return "unknown"
+    return (
+        f"species={facts.get('species') or 'unknown'}, "
+        f"mainColor={facts.get('mainColor') or 'unknown'}, "
+        f"location={facts.get('location') or 'unknown'}, "
+        f"action={facts.get('action') or 'unknown'}, "
+        f"pose={facts.get('pose') or 'unknown'}"
+    )
+
+
+def _humanize_bird_name(name: Optional[str]) -> str:
+    value = (name or "").strip()
+    if not value:
+        return "小鸟"
+    lower = value.lower()
+    cn_map = {
+        "indigo bunting": "靛蓝彩鹀",
+        "common kingfisher": "普通翠鸟",
+        "eurasian hoopoe": "戴胜",
+        "mallard": "绿头鸭",
+        "european bee-eater": "黄喉蜂虎",
+        "long-tailed tit": "长尾山雀",
+    }
+    for key, cn in cn_map.items():
+        if key in lower:
+            return cn
+    return value
+
+
+def _build_generate_prompt(image_url: str, bird_hint: Optional[dict]) -> str:
+    bird_name = _humanize_bird_name((bird_hint or {}).get("birdName"))
+    confidence = float((bird_hint or {}).get("confidence") or 0.0)
+    confidence_percent = round(confidence * 100, 1)
+    return (
+        "You are an assistant for a bird community app. "
+        "Write Chinese copy in exactly 3 sentences with this fixed order: scene, observation, feeling. "
+        "Total length must be 50-90 Chinese characters. "
+        "Do not use markdown, hashtags, emojis, or list format. "
+        "Tone must be natural and warm, like a real user sharing a moment. "
+        "Avoid technical/report wording such as 'matching confidence', 'main subject', 'image shows'. "
+        "Use concrete visual details from the image including color, posture, and surrounding scene. "
+        "If species hint is available, mention it naturally in daily Chinese. "
+        f"Species hint: {bird_name}. "
+        f"Recognition confidence (for your reference only, avoid explicit percentage in final copy): {confidence_percent}%. "
+        f"Image reference: {image_url}."
+    )
+
+
+def _build_polish_prompt(
+    content: str,
+    image_url: str,
+    bird_hint: Optional[dict],
+    style: str = "lite",
+) -> str:
+    bird_name = (bird_hint or {}).get("birdName") or "unknown bird"
+    style_rule = (
+        "Use light polish only: keep wording close to original."
+        if style == "lite"
+        else "Use enhanced polish: stronger rhythm and emotional tension, but still no new facts."
+    )
+    return (
+        "You are an assistant for a bird community app. "
+        "Rewrite and polish the following Chinese post with strict meaning preservation. "
+        "Rules: keep original facts unchanged, do not add new facts, people, time, place, or events; "
+        "improve fluency, readability, and emotional tension; keep concise and natural style. "
+        "Return plain text only. No explanation, no markdown, no hashtags, no bullets, no quotes. "
+        f"{style_rule} "
+        "If species hint conflicts with the original text, trust the original text.\n"
+        f"Species hint (reference only): {bird_name}\n"
+        f"Image reference: {image_url}\n"
+        f"Original copy: {content}"
+    )
+
+
+def _call_deepseek_chat(
+    prompt: str,
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
+) -> Optional[str]:
+    api_key = (settings.deepseek_api_key or "").strip()
+    if not api_key:
+        return None
+
+    base_url = (settings.deepseek_base_url or "").rstrip("/")
+    if not base_url:
+        return None
+
+    req = urllib_request.Request(
+        f"{base_url}/chat/completions",
+        data=json.dumps(
+            {
+                "model": model or settings.deepseek_model,
+                "messages": [
+                    {"role": "system", "content": "You are a helpful copywriting assistant."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": temperature if temperature is not None else settings.deepseek_text_temperature,
+                "max_tokens": max_tokens if max_tokens is not None else settings.deepseek_text_max_tokens,
+            }
+        ).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+    )
+
+    try:
+        with urllib_request.urlopen(req, timeout=settings.deepseek_timeout_seconds) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        content = (
+            payload.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
+        return content or None
+    except (urllib_error.HTTPError, urllib_error.URLError, TimeoutError, json.JSONDecodeError):
+        return None
+
+
+def _resolve_image_input_for_vision(image_url: str) -> Optional[str]:
+    normalized = (image_url or "").strip()
+    if not normalized:
+        return None
+
+    if normalized.startswith(("http://", "https://", "data:image/")):
+        return normalized
+
+    local_path = _resolve_local_image_path(normalized)
+
+    if not local_path or not local_path.exists():
+        return None
+
+    mime_type, _ = mimetypes.guess_type(str(local_path))
+    mime = mime_type or "image/jpeg"
+    encoded = base64.b64encode(local_path.read_bytes()).decode("utf-8")
+    return f"data:{mime};base64,{encoded}"
+
+
+def _is_backend_accessible_image(image_url: str) -> bool:
+    return _resolve_image_input_for_vision(image_url) is not None
+
+
+def _build_visual_grounding_hint(image_url: str) -> str:
+    local_path = _resolve_local_image_path(image_url)
+
+    if not local_path or not local_path.exists():
+        return "unknown"
+
+    try:
+        with Image.open(local_path) as image:
+            rgb = image.convert("RGB").resize((96, 96))
+            pixels = list(rgb.getdata())
+    except (UnidentifiedImageError, OSError):
+        return "unknown"
+
+    total = len(pixels) or 1
+    avg_r = sum(p[0] for p in pixels) / total
+    avg_g = sum(p[1] for p in pixels) / total
+    avg_b = sum(p[2] for p in pixels) / total
+    brightness = (avg_r + avg_g + avg_b) / 3
+    saturation = max(avg_r, avg_g, avg_b) - min(avg_r, avg_g, avg_b)
+
+    if avg_b > avg_r + 14 and avg_b > avg_g + 10:
+        color = "blue-leaning"
+    elif avg_g > avg_r + 12 and avg_g > avg_b + 8:
+        color = "green-leaning"
+    elif avg_r > avg_g + 10 and avg_r > avg_b + 10:
+        color = "red/orange-leaning"
+    elif avg_r > 150 and avg_g > 150 and avg_b < 130:
+        color = "yellow-leaning"
+    else:
+        color = "gray/neutral"
+
+    light = "bright" if brightness >= 170 else ("dim" if brightness <= 90 else "soft")
+    sat = "high" if saturation >= 75 else ("low" if saturation <= 35 else "medium")
+    return f"dominant color={color}; lighting={light}; saturation={sat}"
+
+
+def _inject_visual_grounding(prompt: str, image_url: str) -> str:
+    hint = _build_visual_grounding_hint(image_url)
+    return (
+        f"{prompt}\n"
+        "Strict grounding rules: the color and tone you describe must align with image evidence. "
+        "Avoid generic or contradictory color wording.\n"
+        f"Visual evidence (computed locally): {hint}"
+    )
+
+
+def _call_deepseek_vision_chat(
+    prompt: str,
+    image_url: str,
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
+) -> Optional[str]:
+    api_key = (settings.deepseek_api_key or "").strip()
+    if not api_key:
+        return None
+
+    vision_input = _resolve_image_input_for_vision(image_url)
+    if not vision_input:
+        return None
+
+    base_url = (settings.deepseek_base_url or "").rstrip("/")
+    if not base_url:
+        return None
+
+    req = urllib_request.Request(
+        f"{base_url}/chat/completions",
+        data=json.dumps(
+            {
+                "model": model or settings.deepseek_vision_model or settings.deepseek_model,
+                "messages": [
+                    {"role": "system", "content": "You are a helpful bird caption assistant."},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": vision_input}},
+                        ],
+                    },
+                ],
+                "temperature": (
+                    temperature
+                    if temperature is not None
+                    else settings.deepseek_vision_temperature
+                ),
+                "max_tokens": (
+                    max_tokens if max_tokens is not None else settings.deepseek_vision_max_tokens
+                ),
+            }
+        ).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+    )
+
+    try:
+        with urllib_request.urlopen(req, timeout=settings.deepseek_timeout_seconds) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        content = (
+            payload.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
+        return content or None
+    except (urllib_error.HTTPError, urllib_error.URLError, TimeoutError, json.JSONDecodeError):
+        return None
+
+
+def _has_repeated_fragment(text: str) -> bool:
+    if not text:
+        return False
+    # Repeated short phrase like "好看好看好看" or duplicated chunks.
+    if re.search(r"(.{2,8})\1{2,}", text):
+        return True
+
+    tokens = re.findall(r"[A-Za-z0-9]+|[\u4e00-\u9fff]{1,2}", text)
+    if len(tokens) < 8:
+        return False
+
+    counts = {}
+    for token in tokens:
+        counts[token] = counts.get(token, 0) + 1
+    return any(v >= 5 for v in counts.values())
+
+
+def _is_quality_passed(text: Optional[str], min_length: int, banned_templates: list[str]) -> bool:
+    normalized = (text or "").strip()
+    if not normalized:
+        return False
+    if len(normalized) < min_length:
+        return False
+    if _has_repeated_fragment(normalized):
+        return False
+
+    lowered = normalized.lower()
+    for phrase in banned_templates:
+        if phrase and phrase.lower() in lowered:
+            return False
+    return True
+
+
+def _call_with_quality_retry(
+    call_fn,
+    min_length: int,
+    banned_templates: list[str],
+) -> Optional[str]:
+    first = call_fn()
+    if _is_quality_passed(first, min_length=min_length, banned_templates=banned_templates):
+        return first
+
+    second = call_fn()
+    if _is_quality_passed(second, min_length=min_length, banned_templates=banned_templates):
+        return second
+    return None
+
+
+def _call_with_quality_retry_meta(
+    call_fn,
+    min_length: int,
+    banned_templates: list[str],
+    max_attempts: int = 2,
+) -> dict:
+    started = time.perf_counter()
+    attempts = 0
+    passed = False
+    content = None
+
+    for _ in range(max_attempts):
+        attempts += 1
+        candidate = call_fn()
+        if _is_quality_passed(candidate, min_length=min_length, banned_templates=banned_templates):
+            content = candidate
+            passed = True
+            break
+
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+    return {
+        "content": content if passed else None,
+        "attempts": attempts,
+        "retryCount": max(0, attempts - 1),
+        "fallback": not passed,
+        "elapsedMs": elapsed_ms,
+    }
+def _fallback_generate_copy(
+    bird_hint: Optional[dict],
+    visual_hint: Optional[str] = None,
+    vision_facts: Optional[dict] = None,
+) -> str:
+    bird_name = (bird_hint or {}).get("birdName")
+    confidence = float((bird_hint or {}).get("confidence") or 0.0)
+    confidence_percent = round(confidence * 100, 1)
+
+    main_color = (vision_facts or {}).get("mainColor") or "羽色"
+    action = (vision_facts or {}).get("action") or "停驻"
+    location = (vision_facts or {}).get("location") or "unknown"
+    location_text_map = {
+        "tree_branch": "枝头",
+        "water_edge": "水边",
+        "water_surface": "水面",
+        "sky": "空中",
+        "ground": "地面",
+        "unknown": "画面中",
+    }
+    location_text = location_text_map.get(location, "画面中")
+
+    if bird_name:
+        return (
+            f"画面里一只{bird_name}在{location_text}{action}，主体特征比较清晰。"
+            f"从识别结果看，它的匹配置信度约为{confidence_percent}%。"
+            f"{main_color}和周围光线层次分明，整张图显得很安静。"
+        )
+    return (
+        f"画面中的小鸟在{location_text}{action}，姿态很专注。"
+        f"主体{main_color}更显眼，视觉重心集中在鸟身上。"
+        "这组细节把当下环境的安静感完整保留下来。"
+    )
+
+
+def _normalize_generate_copy(
+    content: str,
+    bird_hint: Optional[dict],
+    visual_hint: Optional[str] = None,
+    vision_facts: Optional[dict] = None,
+) -> str:
+    fallback_sentences = re.split(
+        r"[。！？!?]+",
+        _fallback_generate_copy(bird_hint, visual_hint=visual_hint, vision_facts=vision_facts),
+    )
+    fallback_sentences = [s.strip() for s in fallback_sentences if s.strip()]
+
+    normalized = (content or "").strip()
+    normalized = re.sub(r"[#*_`]", "", normalized)
+    normalized = normalized.replace("\n", "")
+
+    banned_phrases = [
+        "太美了",
+        "好可爱",
+        "真的很治愈",
+        "氛围感拉满",
+    ]
+    for phrase in banned_phrases:
+        normalized = normalized.replace(phrase, "")
+
+    sentences = re.split(r"[。！？!?]+", normalized)
+    sentences = [s.strip(" ，,;；:：") for s in sentences if s.strip(" ，,;；:：")]
+    if not sentences:
+        sentences = fallback_sentences[:]
+
+    while len(sentences) < 3:
+        idx = len(sentences)
+        fallback_sentence = fallback_sentences[idx] if idx < len(fallback_sentences) else "画面细节很有层次"
+        sentences.append(fallback_sentence)
+
+    sentences = sentences[:3]
+    text = "。".join(sentences) + "。"
+
+    min_len = 50
+    max_len = 90
+    if len(text) < min_len:
+        for extra in fallback_sentences:
+            if extra and extra not in text:
+                text = f"{text[:-1]}，{extra}。"
+            if len(text) >= min_len:
+                break
+    if len(text) > max_len:
+        third = sentences[2]
+        max_third_len = max(6, max_len - (len(sentences[0]) + len(sentences[1]) + 3))
+        third = third[:max_third_len].rstrip(" ，,;；:：")
+        text = f"{sentences[0]}。{sentences[1]}。{third}。"
+
+    return text
+
+def _soften_generate_tone(text: str) -> str:
+    normalized = (text or "").strip()
+    if not normalized:
+        return normalized
+
+    replacements = {
+        "主体特征比较清晰": "样子很清楚",
+        "匹配置信度": "识别把握",
+        "画面里一只": "有一只",
+        "画面中的": "这只",
+        "视觉重心": "目光会先落在",
+        "整张图显得": "整幅画面",
+    }
+    for src, dst in replacements.items():
+        normalized = normalized.replace(src, dst)
+
+    for phrase in ["匹配置信度约为", "识别置信度", "confidence"]:
+        if phrase in normalized:
+            normalized = re.sub(r'，?[^，。]*' + re.escape(phrase) + r'[^，。]*', '', normalized)
+
+    normalized = re.sub(r'，+', '，', normalized)
+    normalized = re.sub(r'。+', '。', normalized)
+    normalized = normalized.strip('，')
+    if normalized and normalized[-1] not in '。！？!?':
+        normalized += '。'
+    return normalized
+
+
+def _ensure_generate_mentions_bird(content: str, bird_hint: Optional[dict]) -> str:
+    bird_name = _humanize_bird_name((bird_hint or {}).get("birdName"))
+    if not bird_name or bird_name == "小鸟":
+        return content
+
+    normalized = (content or "").strip()
+    if not normalized:
+        return _fallback_generate_copy(bird_hint)
+    if bird_name in normalized:
+        return normalized
+
+    return f"{normalized}，主角像是{bird_name}"        if normalized[-1] not in "。！？!?"         else f"{normalized[:-1]}，主角像是{bird_name}。"
+
+
+def _fallback_polish_copy(content: str, bird_hint: Optional[dict]) -> str:
+    polished = " ".join(content.split()).strip()
+    if not polished:
+        polished = "今天的观鸟体验很治愈，值得认真记录。"
+    if polished[-1] not in "。！？!?":
+        polished += "。"
+
+    bird_name = (bird_hint or {}).get("birdName")
+    if bird_name and bird_name not in polished:
+        polished += f" 画面里的主角大概率是{bird_name}。"
+    return polished
+
+
+def _normalize_polish_copy(content: str, original_content: str) -> str:
+    normalized = (content or "").strip()
+    normalized = re.sub(r"^```[a-zA-Z]*\s*", "", normalized)
+    normalized = re.sub(r"\s*```$", "", normalized)
+    normalized = normalized.replace("#", "").replace("*", "").replace("`", "")
+    normalized = normalized.strip().strip('"').strip("'")
+
+    if not normalized:
+        normalized = (original_content or "").strip()
+
+    anchors = re.findall(r"[A-Za-z0-9]+", original_content or "")
+    if anchors and not any(anchor in normalized for anchor in anchors):
+        normalized = (original_content or "").strip()
+
+    return normalized
+
+
+def _call_polish_model_with_optional_vision(prompt: str, image_url: str) -> Optional[str]:
+    grounded_prompt = _inject_visual_grounding(prompt, image_url)
+    if _is_backend_accessible_image(image_url):
+        vision_result = _call_deepseek_vision_chat(
+            grounded_prompt,
+            image_url,
+            model=settings.deepseek_vision_model,
+            temperature=settings.deepseek_vision_temperature,
+            max_tokens=settings.deepseek_vision_max_tokens,
+        )
+        if vision_result:
+            return vision_result
+
+    return _call_deepseek_chat(
+        grounded_prompt,
+        model=settings.deepseek_model,
+        temperature=settings.deepseek_text_temperature,
+        max_tokens=settings.deepseek_text_max_tokens,
+    )
+
+
+def _generate_polish_variants(
+    original_content: str,
+    image_url: str,
+    bird_hint: Optional[dict],
+) -> tuple[dict, str, dict]:
+    fallback = _fallback_polish_copy(original_content, bird_hint)
+    banned_templates = [
+        "作为AI",
+        "仅供参考",
+        "希望这段文案",
+        "大家快来看看",
+        "今天分享给大家",
+    ]
+
+    lite_prompt = _build_polish_prompt(original_content, image_url, bird_hint, style="lite")
+    lite_meta = _call_with_quality_retry_meta(
+        lambda: _call_polish_model_with_optional_vision(lite_prompt, image_url),
+        min_length=8,
+        banned_templates=banned_templates,
+    )
+    lite_ai = lite_meta["content"]
+    lite = _normalize_polish_copy(lite_ai or fallback, original_content)
+    lite_source = "deepseek" if lite_ai else "fallback"
+
+    enhanced_prompt = _build_polish_prompt(original_content, image_url, bird_hint, style="enhanced")
+    enhanced_meta = _call_with_quality_retry_meta(
+        lambda: _call_polish_model_with_optional_vision(enhanced_prompt, image_url),
+        min_length=8,
+        banned_templates=banned_templates,
+    )
+    enhanced_ai = enhanced_meta["content"]
+    enhanced = _normalize_polish_copy(enhanced_ai or lite, original_content)
+    enhanced_source = "deepseek" if enhanced_ai else lite_source
+
+    variants = {
+        "lite": lite,
+        "enhanced": enhanced,
+        "defaultVariant": "lite",
+        "sources": {
+            "lite": lite_source,
+            "enhanced": enhanced_source,
+        },
+    }
+    meta = {
+        "lite": {
+            "model": settings.deepseek_model,
+            "elapsedMs": lite_meta["elapsedMs"],
+            "retryCount": lite_meta["retryCount"],
+            "fallback": lite_meta["fallback"],
+        },
+        "enhanced": {
+            "model": settings.deepseek_model,
+            "elapsedMs": enhanced_meta["elapsedMs"],
+            "retryCount": enhanced_meta["retryCount"],
+            "fallback": enhanced_meta["fallback"],
+        },
+    }
+    return variants, lite_source, meta
+
+def generate_post_copywriting(
+    current_user: Optional[dict],
+    mode: str,
+    image_url: str,
+    content: str,
+):
+    if not current_user:
+        return None, (1002, "Unauthorized", 401)
+
+    normalized_mode = (mode or "").strip().lower()
+    normalized_image_url = (image_url or "").strip()
+    normalized_content = (content or "").strip()
+
+    if normalized_mode not in {"generate", "polish"}:
+        return None, (1001, "Invalid mode. Use generate or polish.", 400)
+    if not normalized_image_url:
+        return None, (1001, "imageUrl is required.", 400)
+    if normalized_mode == "generate" and not _is_backend_accessible_image(normalized_image_url):
+        return None, (
+            1001,
+            "imageUrl is not accessible by backend. Please upload image first or provide a public URL.",
+            400,
+        )
+    if normalized_mode == "polish" and not normalized_content:
+        return None, (1001, "content is required when mode is polish.", 400)
+
+    bird_hint = _resolve_bird_hint_for_copywriting(current_user["id"], normalized_image_url)
+    vision_facts = _extract_vision_facts(normalized_image_url, bird_hint) if normalized_mode == "generate" else None
+    vision_facts_text = _format_vision_facts(vision_facts)
+    if normalized_mode == "generate":
+        prompt = _build_generate_prompt(normalized_image_url, bird_hint)
+        prompt = (
+            f"{prompt}\n"
+            "Use these structured visual facts as primary evidence when writing:\n"
+            f"{vision_facts_text}"
+        )
+        fallback_content = _fallback_generate_copy(
+            bird_hint,
+            visual_hint=_build_visual_grounding_hint(normalized_image_url),
+            vision_facts=vision_facts,
+        )
+    else:
+        prompt = _build_polish_prompt(normalized_content, normalized_image_url, bird_hint, style="lite")
+        fallback_content = _fallback_polish_copy(normalized_content, bird_hint)
+    prompt = _inject_visual_grounding(prompt, normalized_image_url)
+
+    ai_content = None
+    ai_source = "fallback"
+    ai_meta = {
+        "mode": normalized_mode,
+        "model": "fallback",
+        "elapsedMs": 0,
+        "retryCount": 0,
+        "fallback": True,
+        "params": {
+            "text": {
+                "temperature": settings.deepseek_text_temperature,
+                "maxTokens": settings.deepseek_text_max_tokens,
+            },
+            "vision": {
+                "temperature": settings.deepseek_vision_temperature,
+                "maxTokens": settings.deepseek_vision_max_tokens,
+            },
+        },
+        "visualHint": _build_visual_grounding_hint(normalized_image_url),
+        "birdHint": bird_hint or {},
+        "visionFacts": vision_facts or {},
+        "warnings": (
+            ["vision model may be text-only; set DEEPSEEK_VISION_MODEL to a vision-capable model"]
+            if (settings.deepseek_vision_model or "").strip() == (settings.deepseek_model or "").strip()
+            else []
+        ),
+    }
+    generate_banned_templates = [
+        "今天给大家分享",
+        "这张图真的太美了",
+        "希望大家喜欢",
+        "作为AI",
+        "仅供参考",
+        "匹配置信度",
+        "主体特征",
+        "画面里一只",
+        "图像显示",
+    ]
+    if normalized_mode == "generate":
+        vision_meta = _call_with_quality_retry_meta(
+            lambda: _call_deepseek_vision_chat(
+                prompt,
+                normalized_image_url,
+                model=settings.deepseek_vision_model,
+                temperature=settings.deepseek_vision_temperature,
+                max_tokens=settings.deepseek_vision_max_tokens,
+            ),
+            min_length=24,
+            banned_templates=generate_banned_templates,
+        )
+        ai_content = vision_meta["content"]
+        if ai_content:
+            ai_source = "deepseek_vision"
+            ai_meta.update(
+                {
+                    "model": settings.deepseek_vision_model,
+                    "elapsedMs": vision_meta["elapsedMs"],
+                    "retryCount": vision_meta["retryCount"],
+                    "fallback": False,
+                }
+            )
+        else:
+            ai_meta.update(
+                {
+                    "elapsedMs": vision_meta["elapsedMs"],
+                    "retryCount": vision_meta["retryCount"],
+                }
+            )
+
+    if normalized_mode != "generate" and not ai_content:
+        min_length = 24 if normalized_mode == "generate" else 8
+        text_meta = _call_with_quality_retry_meta(
+            lambda: _call_deepseek_chat(
+                prompt,
+                model=settings.deepseek_model,
+                temperature=settings.deepseek_text_temperature,
+                max_tokens=settings.deepseek_text_max_tokens,
+            ),
+            min_length=min_length,
+            banned_templates=generate_banned_templates if normalized_mode == "generate" else [],
+        )
+        ai_content = text_meta["content"]
+        if ai_content:
+            ai_source = "deepseek"
+            ai_meta.update(
+                {
+                    "model": settings.deepseek_model,
+                    "elapsedMs": ai_meta["elapsedMs"] + text_meta["elapsedMs"],
+                    "retryCount": ai_meta["retryCount"] + text_meta["retryCount"],
+                    "fallback": False,
+                }
+            )
+        else:
+            ai_meta.update(
+                {
+                    "elapsedMs": ai_meta["elapsedMs"] + text_meta["elapsedMs"],
+                    "retryCount": ai_meta["retryCount"] + text_meta["retryCount"],
+                    "fallback": True,
+                }
+            )
+
+    output_content = ai_content or fallback_content
+    extra_data = {}
+    if normalized_mode == "generate":
+        output_content = _ensure_generate_mentions_bird(output_content, bird_hint)
+        output_content = _normalize_generate_copy(
+            output_content,
+            bird_hint,
+            visual_hint=ai_meta["visualHint"],
+            vision_facts=vision_facts,
+        )
+        output_content = _soften_generate_tone(output_content)
+    else:
+        variants, lite_source, polish_meta = _generate_polish_variants(
+            original_content=normalized_content,
+            image_url=normalized_image_url,
+            bird_hint=bird_hint,
+        )
+        output_content = variants["lite"]
+        ai_source = lite_source
+        extra_data.update(variants)
+        ai_meta.update(
+            {
+                "model": settings.deepseek_model if lite_source == "deepseek" else "fallback",
+                "elapsedMs": polish_meta["lite"]["elapsedMs"] + polish_meta["enhanced"]["elapsedMs"],
+                "retryCount": polish_meta["lite"]["retryCount"] + polish_meta["enhanced"]["retryCount"],
+                "fallback": lite_source == "fallback",
+                "variants": polish_meta,
+            }
+        )
+
+    result = {
+        "mode": normalized_mode,
+        "content": output_content,
+        "source": ai_source,
+        "aiMeta": ai_meta,
+    }
+    if extra_data:
+        result.update(extra_data)
+    return result, None
 
 
 def list_posts(page: int, page_size: int, keyword: Optional[str] = None):
@@ -448,11 +1346,11 @@ def get_post_detail(post_id: int):
         with SessionLocal() as db:
             post = db.get(Post, post_id)
             if not post:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
 
             user = db.get(User, post.user_id)
             if not user:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
 
             return _serialize_post_item(post, _serialize_user_model(user)), None
     except SQLAlchemyError:
@@ -467,9 +1365,9 @@ def update_post(current_user: Optional[dict], post_id: int, content: str, image_
         with SessionLocal() as db:
             post = db.get(Post, post_id)
             if not post:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
             if post.user_id != current_user["id"]:
-                return None, (1003, "无权限", 403)
+                return None, (1003, "Forbidden.", 403)
 
             post.content = content
             post.image_url = image_url
@@ -488,9 +1386,9 @@ def delete_post(current_user: Optional[dict], post_id: int):
         with SessionLocal() as db:
             post = db.get(Post, post_id)
             if not post:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
             if post.user_id != current_user["id"]:
-                return None, (1003, "无权限", 403)
+                return None, (1003, "Forbidden.", 403)
 
             db.delete(post)
             db.commit()
@@ -507,7 +1405,7 @@ def like_post(current_user: Optional[dict], post_id: int):
         with SessionLocal() as db:
             post = db.get(Post, post_id)
             if not post:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
 
             existing = db.scalar(
                 select(Like).where(
@@ -538,7 +1436,7 @@ def create_comment(current_user: Optional[dict], post_id: int, content: str, par
         with SessionLocal() as db:
             post = db.get(Post, post_id)
             if not post:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
 
             if parent_id is not None:
                 parent_comment = db.get(Comment, parent_id)
@@ -559,3 +1457,4 @@ def create_comment(current_user: Optional[dict], post_id: int, content: str, par
             return {"commentId": comment.id}, None
     except SQLAlchemyError:
         return None, (1005, "服务内部错误", 500)
+
