@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+﻿from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Optional
@@ -125,9 +125,9 @@ def register_user(username: str, email: str, password: str):
     try:
         with SessionLocal() as db:
             if db.scalar(select(User).where(User.email == email)):
-                return None, (1009, "邮箱已注册", 409)
+                return None, (1009, "Email already registered", 409)
             if db.scalar(select(User).where(User.username == username)):
-                return None, (1009, "用户名已存在", 409)
+                return None, (1009, "Username already registered", 409)
 
             user = User(
                 username=username,
@@ -140,7 +140,7 @@ def register_user(username: str, email: str, password: str):
             db.refresh(user)
             return {"userId": user.id}, None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "Database error", 500)
 
 
 def login_user(email: str, password: str):
@@ -148,7 +148,7 @@ def login_user(email: str, password: str):
         with SessionLocal() as db:
             user = db.scalar(select(User).where(User.email == email))
             if not user or not verify_password(password, user.password_hash):
-                return None, (1002, "邮箱或密码错误", 401)
+                return None, (1002, "Invalid email or password", 401)
 
             user_dict = _serialize_user_model(user)
             return {
@@ -156,7 +156,7 @@ def login_user(email: str, password: str):
                 "user": serialize_user_brief(user_dict),
             }, None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "Database error", 500)
 
 
 def logout_user():
@@ -165,7 +165,7 @@ def logout_user():
 
 def get_user_profile(current_user: Optional[dict]):
     if not current_user:
-        return None, (1002, "未登录或 Token 无效", 401)
+        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
 
     return {
         "id": current_user["id"],
@@ -267,15 +267,15 @@ def recognize_bird_for_user(
     file_bytes: Optional[bytes],
 ):
     if not current_user:
-        return None, (1002, "未登录或 Token 无效", 401)
+        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
     if not filename:
-        return None, (1006, "上传文件不合法", 400)
+        return None, (1006, "Invalid upload file.", 400)
     if not file_bytes:
-        return None, (1006, "上传文件不合法", 400)
+        return None, (1006, "Invalid upload file.", 400)
 
     suffix = Path(filename).suffix.lower()
     if suffix not in ALLOWED_IMAGE_EXTENSIONS:
-        return None, (1006, "上传文件不合法", 400)
+        return None, (1006, "Invalid upload file.", 400)
 
     image_url = _save_upload_file(filename, file_bytes)
     saved_file_path = UPLOADS_DIR / Path(image_url).name
@@ -284,7 +284,7 @@ def recognize_bird_for_user(
     except (UnidentifiedImageError, OSError):
         if saved_file_path.exists():
             saved_file_path.unlink(missing_ok=True)
-        return None, (1006, "上传文件不合法", 400)
+        return None, (1006, "Invalid upload file.", 400)
 
     try:
         with SessionLocal() as db:
@@ -300,12 +300,12 @@ def recognize_bird_for_user(
 
             return _serialize_bird_record_item(record), None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
 
 
 def list_bird_records(current_user: Optional[dict], page: int, page_size: int):
     if not current_user:
-        return None, (1002, "未登录或 Token 无效", 401)
+        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
 
     try:
         with SessionLocal() as db:
@@ -329,65 +329,65 @@ def list_bird_records(current_user: Optional[dict], page: int, page_size: int):
                 "pageSize": page_size,
             }, None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
 
 
 def get_bird_record_detail(current_user: Optional[dict], record_id: int):
     if not current_user:
-        return None, (1002, "未登录或 Token 无效", 401)
+        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
 
     try:
         with SessionLocal() as db:
             record = db.get(BirdRecord, record_id)
             if not record:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
             if record.user_id != current_user["id"]:
-                return None, (1003, "无权限", 403)
+                return None, (1003, "Forbidden.", 403)
             return _serialize_bird_record_item(record), None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
 
 
 def update_bird_record(current_user: Optional[dict], record_id: int, bird_name: str):
     if not current_user:
-        return None, (1002, "未登录或 Token 无效", 401)
+        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
 
     try:
         with SessionLocal() as db:
             record = db.get(BirdRecord, record_id)
             if not record:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
             if record.user_id != current_user["id"]:
-                return None, (1003, "无权限", 403)
+                return None, (1003, "Forbidden.", 403)
             record.bird_name = bird_name.strip()
             db.commit()
             db.refresh(record)
             return _serialize_bird_record_item(record), None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
 
 
 def delete_bird_record(current_user: Optional[dict], record_id: int):
     if not current_user:
-        return None, (1002, "未登录或 Token 无效", 401)
+        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
 
     try:
         with SessionLocal() as db:
             record = db.get(BirdRecord, record_id)
             if not record:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
             if record.user_id != current_user["id"]:
-                return None, (1003, "无权限", 403)
+                return None, (1003, "Forbidden.", 403)
             db.delete(record)
             db.commit()
             return {"recordId": record_id, "deleted": True}, None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
 
 
 def create_post(current_user: Optional[dict], content: str, image_url: Optional[str]):
     if not current_user:
-        return None, (1002, "未登录或 Token 无效", 401)
+        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
 
     try:
         with SessionLocal() as db:
@@ -403,10 +403,10 @@ def create_post(current_user: Optional[dict], content: str, image_url: Optional[
             db.refresh(post)
             return {"postId": post.id}, None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
 
 
-def _find_recent_bird_hint(user_id: int, image_url: str) -> Optional[str]:
+def _find_recent_bird_hint(user_id: int, image_url: str) -> Optional[dict]:
     normalized_image_url = (image_url or "").strip()
     if not normalized_image_url:
         return None
@@ -422,31 +422,40 @@ def _find_recent_bird_hint(user_id: int, image_url: str) -> Optional[str]:
                 .order_by(BirdRecord.created_at.desc(), BirdRecord.id.desc())
                 .limit(1)
             )
-            return record.bird_name if record else None
+            if not record:
+                return None
+            return {
+                "birdName": record.bird_name,
+                "confidence": float(record.confidence or 0.0),
+            }
     except SQLAlchemyError:
         return None
 
 
-def _build_generate_prompt(image_url: str, bird_hint: Optional[str]) -> str:
-    bird_hint_text = bird_hint or "unknown bird"
+def _build_generate_prompt(image_url: str, bird_hint: Optional[dict]) -> str:
+    bird_name = (bird_hint or {}).get("birdName") or "unknown bird"
+    confidence = float((bird_hint or {}).get("confidence") or 0.0)
+    confidence_percent = round(confidence * 100, 1)
     return (
         "You are an assistant for a bird community app. "
         "Write one concise Chinese social post caption with 2-4 sentences. "
         "Style should be warm, natural, and suitable for sharing. "
         "Do not use markdown. Do not include hashtags. "
-        f"Known bird hint: {bird_hint_text}. "
+        "If species hint is available, explicitly mention the species name in the caption. "
+        f"Species hint: {bird_name}. "
+        f"Recognition confidence: {confidence_percent}%. "
         f"Image reference: {image_url}."
     )
 
 
-def _build_polish_prompt(content: str, image_url: str, bird_hint: Optional[str]) -> str:
-    bird_hint_text = bird_hint or "unknown bird"
+def _build_polish_prompt(content: str, image_url: str, bird_hint: Optional[dict]) -> str:
+    bird_name = (bird_hint or {}).get("birdName") or "unknown bird"
     return (
         "You are an assistant for a bird community app. "
         "Polish the following Chinese post copy while keeping original meaning. "
         "Output only polished text, no explanation, no markdown, no hashtags. "
         "Keep it concise and natural.\n"
-        f"Known bird hint: {bird_hint_text}\n"
+        f"Known bird hint: {bird_name}\n"
         f"Image reference: {image_url}\n"
         f"Original copy: {content}"
     )
@@ -495,28 +504,50 @@ def _call_deepseek_chat(prompt: str) -> Optional[str]:
         return None
 
 
-def _fallback_generate_copy(bird_hint: Optional[str]) -> str:
-    if bird_hint:
+def _fallback_generate_copy(bird_hint: Optional[dict]) -> str:
+    bird_name = (bird_hint or {}).get("birdName")
+    confidence = float((bird_hint or {}).get("confidence") or 0.0)
+    confidence_percent = round(confidence * 100, 1)
+
+    if bird_name:
         return (
-            f"今天在野外偶遇一只{bird_hint}，状态特别灵动。"
+            f"今天在公园遇到一只{bird_name}，状态特别灵动。"
+            f"从识别结果看，它的匹配置信度大约是{confidence_percent}%。"
             "阳光下的羽色很有层次，越看越治愈。"
-            "把这一刻分享给同样喜欢观鸟的你。"
         )
     return (
-        "今天的观鸟时刻太惊喜了，画面里这位小家伙特别上镜。"
-        "安静观察了好一会儿，越看越觉得自然真的很有魅力。"
-        "记录下这一帧，留给之后慢慢回味。"
+        "今天在公园偶遇一位羽毛小可爱，站在枝头很有气质。"
+        "安静观察了好一会儿，越看越觉得自然特别治愈。"
+        "把这一刻记录下来，分享给同样喜欢观鸟的朋友。"
     )
 
 
-def _fallback_polish_copy(content: str, bird_hint: Optional[str]) -> str:
+def _ensure_generate_mentions_bird(content: str, bird_hint: Optional[dict]) -> str:
+    bird_name = (bird_hint or {}).get("birdName")
+    if not bird_name:
+        return content
+
+    normalized = (content or "").strip()
+    if not normalized:
+        return _fallback_generate_copy(bird_hint)
+    if bird_name in normalized:
+        return normalized
+
+    confidence = float((bird_hint or {}).get("confidence") or 0.0)
+    confidence_percent = round(confidence * 100, 1)
+    return f"{normalized} 主角大概率是{bird_name}（识别置信度{confidence_percent}%）。"
+
+
+def _fallback_polish_copy(content: str, bird_hint: Optional[dict]) -> str:
     polished = " ".join(content.split()).strip()
     if not polished:
         polished = "今天的观鸟体验很治愈，值得认真记录。"
     if polished[-1] not in "。！？!?":
         polished += "。"
-    if bird_hint and bird_hint not in polished:
-        polished += f" 画面里的主角大概率是{bird_hint}。"
+
+    bird_name = (bird_hint or {}).get("birdName")
+    if bird_name and bird_name not in polished:
+        polished += f" 画面里的主角大概率是{bird_name}。"
     return polished
 
 
@@ -527,7 +558,7 @@ def generate_post_copywriting(
     content: str,
 ):
     if not current_user:
-        return None, (1002, "éˆî†æ«¥è¤°æ›Ÿåž¨ Token éƒçŠ³æ™¥", 401)
+        return None, (1002, "Unauthorized", 401)
 
     normalized_mode = (mode or "").strip().lower()
     normalized_image_url = (image_url or "").strip()
@@ -549,9 +580,13 @@ def generate_post_copywriting(
         fallback_content = _fallback_polish_copy(normalized_content, bird_hint)
 
     ai_content = _call_deepseek_chat(prompt)
+    output_content = ai_content or fallback_content
+    if normalized_mode == "generate":
+        output_content = _ensure_generate_mentions_bird(output_content, bird_hint)
+
     return {
         "mode": normalized_mode,
-        "content": ai_content or fallback_content,
+        "content": output_content,
         "source": "deepseek" if ai_content else "fallback",
     }, None
 
@@ -594,7 +629,7 @@ def list_posts(page: int, page_size: int, keyword: Optional[str] = None):
                 "pageSize": page_size,
             }, None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
 
 
 def get_post_detail(post_id: int):
@@ -602,28 +637,28 @@ def get_post_detail(post_id: int):
         with SessionLocal() as db:
             post = db.get(Post, post_id)
             if not post:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
 
             user = db.get(User, post.user_id)
             if not user:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
 
             return _serialize_post_item(post, _serialize_user_model(user)), None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
 
 
 def update_post(current_user: Optional[dict], post_id: int, content: str, image_url: Optional[str]):
     if not current_user:
-        return None, (1002, "未登录或 Token 无效", 401)
+        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
 
     try:
         with SessionLocal() as db:
             post = db.get(Post, post_id)
             if not post:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
             if post.user_id != current_user["id"]:
-                return None, (1003, "无权限", 403)
+                return None, (1003, "Forbidden.", 403)
 
             post.content = content
             post.image_url = image_url
@@ -631,37 +666,37 @@ def update_post(current_user: Optional[dict], post_id: int, content: str, image_
             db.commit()
             return {"postId": post_id}, None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
 
 
 def delete_post(current_user: Optional[dict], post_id: int):
     if not current_user:
-        return None, (1002, "未登录或 Token 无效", 401)
+        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
 
     try:
         with SessionLocal() as db:
             post = db.get(Post, post_id)
             if not post:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
             if post.user_id != current_user["id"]:
-                return None, (1003, "无权限", 403)
+                return None, (1003, "Forbidden.", 403)
 
             db.delete(post)
             db.commit()
             return {"postId": post_id, "deleted": True}, None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
 
 
 def like_post(current_user: Optional[dict], post_id: int):
     if not current_user:
-        return None, (1002, "未登录或 Token 无效", 401)
+        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
 
     try:
         with SessionLocal() as db:
             post = db.get(Post, post_id)
             if not post:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
 
             existing = db.scalar(
                 select(Like).where(
@@ -670,7 +705,7 @@ def like_post(current_user: Optional[dict], post_id: int):
                 )
             )
             if existing:
-                return None, (1009, "资源冲突", 409)
+                return None, (1009, "璧勬簮鍐茬獊", 409)
 
             like = Like(user_id=current_user["id"], post_id=post_id)
             db.add(like)
@@ -679,25 +714,25 @@ def like_post(current_user: Optional[dict], post_id: int):
             db.commit()
             return {"postId": post_id, "liked": True}, None
     except IntegrityError:
-        return None, (1009, "资源冲突", 409)
+        return None, (1009, "璧勬簮鍐茬獊", 409)
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
 
 
 def create_comment(current_user: Optional[dict], post_id: int, content: str, parent_id: Optional[int]):
     if not current_user:
-        return None, (1002, "未登录或 Token 无效", 401)
+        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
 
     try:
         with SessionLocal() as db:
             post = db.get(Post, post_id)
             if not post:
-                return None, (1004, "资源不存在", 404)
+                return None, (1004, "Resource not found.", 404)
 
             if parent_id is not None:
                 parent_comment = db.get(Comment, parent_id)
                 if not parent_comment or parent_comment.post_id != post_id:
-                    return None, (1004, "父评论不存在", 404)
+                    return None, (1004, "鐖惰瘎璁轰笉瀛樺湪", 404)
 
             comment = Comment(
                 post_id=post_id,
@@ -712,4 +747,4 @@ def create_comment(current_user: Optional[dict], post_id: int, content: str, par
             db.refresh(comment)
             return {"commentId": comment.id}, None
     except SQLAlchemyError:
-        return None, (1005, "服务内部错误", 500)
+        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)

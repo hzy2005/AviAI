@@ -437,6 +437,29 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["code"], 1001)
 
+    def test_posts_ai_copywriting_generate_mentions_recognized_bird(self):
+        token = self.login()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        recognize_response = self.client.post(
+            "/api/v1/birds/recognize",
+            headers=headers,
+            files={"image": ("ai-grounding.png", io.BytesIO(self.valid_image_bytes()), "image/png")},
+        )
+        self.assertEqual(recognize_response.status_code, 201)
+        recognize_data = recognize_response.json()["data"]
+        bird_name = recognize_data["birdName"]
+        image_url = recognize_data["imageUrl"]
+
+        generate_response = self.client.post(
+            "/api/v1/posts/ai-copywriting",
+            headers=headers,
+            json={"mode": "generate", "imageUrl": image_url, "content": ""},
+        )
+        self.assertEqual(generate_response.status_code, 200)
+        generate_content = generate_response.json()["data"]["content"]
+        self.assertIn(bird_name, generate_content)
+
     def test_health(self):
         response = self.client.get("/api/v1/health")
         self.assertEqual(response.status_code, 200)
