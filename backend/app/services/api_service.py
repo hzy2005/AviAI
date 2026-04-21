@@ -408,6 +408,26 @@ def create_post(current_user: Optional[dict], content: str, image_url: Optional[
     except SQLAlchemyError:
         return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
 
+def upload_post_image(
+    current_user: Optional[dict],
+    filename: Optional[str],
+    file_bytes: Optional[bytes],
+):
+    if not current_user:
+        return None, (1002, "Unauthorized", 401)
+    if not filename or not file_bytes:
+        return None, (1006, "Invalid upload file.", 400)
+
+    suffix = Path(filename).suffix.lower()
+    if suffix not in ALLOWED_IMAGE_EXTENSIONS:
+        return None, (1006, "Invalid upload file.", 400)
+
+    try:
+        image_url = _save_upload_file(filename, file_bytes)
+        return {"imageUrl": image_url}, None
+    except OSError:
+        return None, (1005, "Storage write failed", 500)
+
 
 def _find_recent_bird_hint(user_id: int, image_url: str) -> Optional[dict]:
     normalized_image_url = (image_url or "").strip()
@@ -550,6 +570,10 @@ def _resolve_image_input_for_vision(image_url: str) -> Optional[str]:
     mime = mime_type or "image/jpeg"
     encoded = base64.b64encode(local_path.read_bytes()).decode("utf-8")
     return f"data:{mime};base64,{encoded}"
+
+
+def _is_backend_accessible_image(image_url: str) -> bool:
+    return _resolve_image_input_for_vision(image_url) is not None
 
 
 def _call_deepseek_vision_chat(
@@ -888,6 +912,12 @@ def generate_post_copywriting(
         return None, (1001, "Invalid mode. Use generate or polish.", 400)
     if not normalized_image_url:
         return None, (1001, "imageUrl is required.", 400)
+    if normalized_mode == "generate" and not _is_backend_accessible_image(normalized_image_url):
+        return None, (
+            1001,
+            "imageUrl is not accessible by backend. Please upload image first or provide a public URL.",
+            400,
+        )
     if normalized_mode == "polish" and not normalized_content:
         return None, (1001, "content is required when mode is polish.", 400)
 

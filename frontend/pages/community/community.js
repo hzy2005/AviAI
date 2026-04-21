@@ -32,6 +32,16 @@ function getDraftAiButtonText(content) {
   return String(content || "").trim() ? "AI Polish" : "AI Generate";
 }
 
+function isLocalTempImage(path) {
+  const value = String(path || "").trim();
+  if (!value) return false;
+  return (
+    value.startsWith("wxfile://") ||
+    value.startsWith("http://tmp/") ||
+    value.startsWith("tmp/")
+  );
+}
+
 Page({
   data: {
     posts: [],
@@ -300,13 +310,47 @@ Page({
     this.setData({ draftImages: next });
   },
 
+  async ensureDraftImageUploaded() {
+    const current = this.data.draftImages[0] || "";
+    if (!current || !isLocalTempImage(current)) {
+      return current;
+    }
+
+    const uploadRes = await posts.uploadImage(current);
+    const uploadedUrl = (uploadRes.data && uploadRes.data.imageUrl) || "";
+    if (!uploadedUrl) {
+      throw new Error("Image upload failed");
+    }
+
+    const nextImages = [...this.data.draftImages];
+    nextImages[0] = uploadedUrl;
+    this.setData({ draftImages: nextImages });
+    return uploadedUrl;
+  },
+
+  async ensureEditingImageUploaded() {
+    const current = this.data.editingImages[0] || "";
+    if (!current || !isLocalTempImage(current)) {
+      return current;
+    }
+
+    const uploadRes = await posts.uploadImage(current);
+    const uploadedUrl = (uploadRes.data && uploadRes.data.imageUrl) || "";
+    if (!uploadedUrl) {
+      throw new Error("Image upload failed");
+    }
+
+    const nextImages = [...this.data.editingImages];
+    nextImages[0] = uploadedUrl;
+    this.setData({ editingImages: nextImages });
+    return uploadedUrl;
+  },
+
   async onGenerateAICopy() {
     if (!requireAuth()) return;
-
-    const imageUrl = this.data.draftImages[0] || "";
     const content = this.data.draftContent.trim();
-
-    if (!imageUrl) {
+    const firstImage = this.data.draftImages[0] || "";
+    if (!firstImage) {
       wx.showToast({ title: "Please add a photo first", icon: "none" });
       return;
     }
@@ -315,6 +359,7 @@ Page({
 
     try {
       this.setData({ aiCopyLoading: true });
+      const imageUrl = await this.ensureDraftImageUploaded();
       const res = await posts.aiCopywriting({
         mode,
         imageUrl,
@@ -347,9 +392,10 @@ Page({
 
     try {
       this.setData({ submitting: true });
+      const imageUrl = await this.ensureDraftImageUploaded();
       await posts.create({
         content,
-        imageUrl: this.data.draftImages[0] || null
+        imageUrl: imageUrl || null
       });
       wx.showToast({ title: "Posted", icon: "success" });
       this.setData({
@@ -426,9 +472,10 @@ Page({
     }
 
     try {
+      const imageUrl = await this.ensureEditingImageUploaded();
       await posts.update(postId, {
         content,
-        imageUrl: this.data.editingImages[0] || null
+        imageUrl: imageUrl || null
       });
       wx.showToast({ title: "Updated", icon: "success" });
       this.setData({ editingPostId: null, editingContent: "", editingImages: [] });

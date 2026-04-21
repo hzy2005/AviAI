@@ -259,3 +259,26 @@
   - `data.content` equals `data.lite` (frontend default render).
 - `data.sources` records per-variant source.
 - `data.aiMeta.variants` records per-variant observability.
+
+### 6.3 Image Upload Before AI Copywriting
+
+- New endpoint: `POST /api/v1/posts/upload-image`
+- Content type: `multipart/form-data`
+- Form field: `image`
+- Success response:
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "imageUrl": "/uploads/20260421_xxx.jpg"
+  }
+}
+```
+
+- Recommended frontend flow:
+1. User selects image (local temp path).
+2. Call `POST /api/v1/posts/upload-image` first and store returned `/uploads/...`.
+3. Call `POST /api/v1/posts/ai-copywriting` with uploaded `imageUrl`.
+4. Call `POST /api/v1/posts` or `PUT /api/v1/posts/{postId}` with uploaded `imageUrl`.

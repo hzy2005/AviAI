@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 
 from app.core.responses import error, success
 from app.routes.deps import get_current_user
@@ -27,6 +27,18 @@ def ai_copywriting(payload: AICopywritingRequest, current_user=Depends(get_curre
     if err:
         return error(err[0], err[1], err[2])
     return success(data)
+
+
+@router.post("/upload-image")
+async def upload_post_image(
+    image: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+):
+    file_bytes = await image.read()
+    data, err = api_service.upload_post_image(current_user, image.filename, file_bytes)
+    if err:
+        return error(err[0], err[1], err[2])
+    return success(data, status_code=201)
 
 
 @router.get("")
