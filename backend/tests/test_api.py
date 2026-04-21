@@ -726,7 +726,7 @@ class ApiTestCase(unittest.TestCase):
         create_post_response = self.client.post(
             "/api/v1/posts",
             headers=headers,
-            json={"content": "娴嬭瘯鍔ㄦ€?, "imageUrl": "/uploads/test.jpg"},
+            json={"content": "test post content", "imageUrl": "/uploads/test.jpg"},
         )
         self.assertEqual(create_post_response.status_code, 201)
         post_id = create_post_response.json()["data"]["postId"]
@@ -742,7 +742,7 @@ class ApiTestCase(unittest.TestCase):
         update_response = self.client.put(
             f"/api/v1/posts/{post_id}",
             headers=headers,
-            json={"content": "鏇存柊鍚庣殑鍔ㄦ€?, "imageUrl": "/uploads/updated.jpg"},
+            json={"content": "updated test post content", "imageUrl": "/uploads/updated.jpg"},
         )
         self.assertEqual(update_response.status_code, 200)
 

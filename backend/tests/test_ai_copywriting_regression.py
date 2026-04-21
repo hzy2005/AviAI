@@ -1,5 +1,70 @@
+import sys
 import unittest
+from pathlib import Path
+import types
 from unittest.mock import patch
+
+CURRENT_FILE = Path(__file__).resolve()
+BACKEND_ROOT = CURRENT_FILE.parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
+
+if "fastapi" not in sys.modules:
+    fastapi_stub = types.ModuleType("fastapi")
+    fastapi_stub.Header = lambda default=None: default
+    sys.modules["fastapi"] = fastapi_stub
+
+if "app.db.session" not in sys.modules:
+    db_session_stub = types.ModuleType("app.db.session")
+
+    class _DummySession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    db_session_stub.SessionLocal = lambda: _DummySession()
+    db_session_stub.engine = None
+    sys.modules["app.db.session"] = db_session_stub
+
+# Lightweight stubs so tests can import api_service without local torch install.
+if "torch" not in sys.modules:
+    torch_stub = types.ModuleType("torch")
+
+    class _NoGrad:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    torch_stub.no_grad = lambda: _NoGrad()
+    nn_stub = types.ModuleType("torch.nn")
+    functional_stub = types.ModuleType("torch.nn.functional")
+    functional_stub.softmax = lambda logits, dim=1: logits
+    nn_stub.functional = functional_stub
+    torch_stub.nn = nn_stub
+    sys.modules["torch"] = torch_stub
+    sys.modules["torch.nn"] = nn_stub
+    sys.modules["torch.nn.functional"] = functional_stub
+
+if "torchvision.models" not in sys.modules:
+    tv_stub = types.ModuleType("torchvision")
+    models_stub = types.ModuleType("torchvision.models")
+
+    class _Weights:
+        meta = {"categories": []}
+
+        @staticmethod
+        def transforms():
+            return lambda img: img
+
+    models_stub.ResNet18_Weights = types.SimpleNamespace(DEFAULT=_Weights())
+    models_stub.resnet18 = lambda weights=None: types.SimpleNamespace(eval=lambda: None)
+    tv_stub.models = models_stub
+    sys.modules["torchvision"] = tv_stub
+    sys.modules["torchvision.models"] = models_stub
 
 from app.services import api_service
 
@@ -59,6 +124,10 @@ class AICopywritingRegressionTest(unittest.TestCase):
             api_service,
             "_call_with_quality_retry_meta",
             return_value={"content": "stub", "attempts": 1, "retryCount": 0, "fallback": False, "elapsedMs": 1},
+        ), patch.object(
+            api_service,
+            "_find_recent_bird_hint",
+            return_value={"birdName": "Mallard", "confidence": 0.9},
         ):
             data, err = api_service.generate_post_copywriting(
                 current_user=user,
