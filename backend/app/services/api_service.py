@@ -1,6 +1,9 @@
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 from typing import Optional
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 from uuid import uuid4
 import threading
 
@@ -12,6 +15,7 @@ import torch.nn.functional as F
 from torchvision.models import ResNet18_Weights, resnet18
 
 from app.core.auth import create_access_token, decode_access_token, hash_password, verify_password
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.bird_record import BirdRecord
 from app.models.comment import Comment
@@ -400,6 +404,156 @@ def create_post(current_user: Optional[dict], content: str, image_url: Optional[
             return {"postId": post.id}, None
     except SQLAlchemyError:
         return None, (1005, "服务内部错误", 500)
+
+
+def _find_recent_bird_hint(user_id: int, image_url: str) -> Optional[str]:
+    normalized_image_url = (image_url or "").strip()
+    if not normalized_image_url:
+        return None
+
+    try:
+        with SessionLocal() as db:
+            record = db.scalar(
+                select(BirdRecord)
+                .where(
+                    BirdRecord.user_id == user_id,
+                    BirdRecord.image_url == normalized_image_url,
+                )
+                .order_by(BirdRecord.created_at.desc(), BirdRecord.id.desc())
+                .limit(1)
+            )
+            return record.bird_name if record else None
+    except SQLAlchemyError:
+        return None
+
+
+def _build_generate_prompt(image_url: str, bird_hint: Optional[str]) -> str:
+    bird_hint_text = bird_hint or "unknown bird"
+    return (
+        "You are an assistant for a bird community app. "
+        "Write one concise Chinese social post caption with 2-4 sentences. "
+        "Style should be warm, natural, and suitable for sharing. "
+        "Do not use markdown. Do not include hashtags. "
+        f"Known bird hint: {bird_hint_text}. "
+        f"Image reference: {image_url}."
+    )
+
+
+def _build_polish_prompt(content: str, image_url: str, bird_hint: Optional[str]) -> str:
+    bird_hint_text = bird_hint or "unknown bird"
+    return (
+        "You are an assistant for a bird community app. "
+        "Polish the following Chinese post copy while keeping original meaning. "
+        "Output only polished text, no explanation, no markdown, no hashtags. "
+        "Keep it concise and natural.\n"
+        f"Known bird hint: {bird_hint_text}\n"
+        f"Image reference: {image_url}\n"
+        f"Original copy: {content}"
+    )
+
+
+def _call_deepseek_chat(prompt: str) -> Optional[str]:
+    api_key = (settings.deepseek_api_key or "").strip()
+    if not api_key:
+        return None
+
+    base_url = (settings.deepseek_base_url or "").rstrip("/")
+    if not base_url:
+        return None
+
+    req = urllib_request.Request(
+        f"{base_url}/chat/completions",
+        data=json.dumps(
+            {
+                "model": settings.deepseek_model,
+                "messages": [
+                    {"role": "system", "content": "You are a helpful copywriting assistant."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.7,
+                "max_tokens": 240,
+            }
+        ).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+    )
+
+    try:
+        with urllib_request.urlopen(req, timeout=settings.deepseek_timeout_seconds) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        content = (
+            payload.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
+        return content or None
+    except (urllib_error.HTTPError, urllib_error.URLError, TimeoutError, json.JSONDecodeError):
+        return None
+
+
+def _fallback_generate_copy(bird_hint: Optional[str]) -> str:
+    if bird_hint:
+        return (
+            f"今天在野外偶遇一只{bird_hint}，状态特别灵动。"
+            "阳光下的羽色很有层次，越看越治愈。"
+            "把这一刻分享给同样喜欢观鸟的你。"
+        )
+    return (
+        "今天的观鸟时刻太惊喜了，画面里这位小家伙特别上镜。"
+        "安静观察了好一会儿，越看越觉得自然真的很有魅力。"
+        "记录下这一帧，留给之后慢慢回味。"
+    )
+
+
+def _fallback_polish_copy(content: str, bird_hint: Optional[str]) -> str:
+    polished = " ".join(content.split()).strip()
+    if not polished:
+        polished = "今天的观鸟体验很治愈，值得认真记录。"
+    if polished[-1] not in "。！？!?":
+        polished += "。"
+    if bird_hint and bird_hint not in polished:
+        polished += f" 画面里的主角大概率是{bird_hint}。"
+    return polished
+
+
+def generate_post_copywriting(
+    current_user: Optional[dict],
+    mode: str,
+    image_url: str,
+    content: str,
+):
+    if not current_user:
+        return None, (1002, "éˆî†æ«¥è¤°æ›Ÿåž¨ Token éƒçŠ³æ™¥", 401)
+
+    normalized_mode = (mode or "").strip().lower()
+    normalized_image_url = (image_url or "").strip()
+    normalized_content = (content or "").strip()
+
+    if normalized_mode not in {"generate", "polish"}:
+        return None, (1001, "Invalid mode. Use generate or polish.", 400)
+    if not normalized_image_url:
+        return None, (1001, "imageUrl is required.", 400)
+    if normalized_mode == "polish" and not normalized_content:
+        return None, (1001, "content is required when mode is polish.", 400)
+
+    bird_hint = _find_recent_bird_hint(current_user["id"], normalized_image_url)
+    if normalized_mode == "generate":
+        prompt = _build_generate_prompt(normalized_image_url, bird_hint)
+        fallback_content = _fallback_generate_copy(bird_hint)
+    else:
+        prompt = _build_polish_prompt(normalized_content, normalized_image_url, bird_hint)
+        fallback_content = _fallback_polish_copy(normalized_content, bird_hint)
+
+    ai_content = _call_deepseek_chat(prompt)
+    return {
+        "mode": normalized_mode,
+        "content": ai_content or fallback_content,
+        "source": "deepseek" if ai_content else "fallback",
+    }, None
 
 
 def list_posts(page: int, page_size: int, keyword: Optional[str] = None):

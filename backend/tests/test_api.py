@@ -393,6 +393,50 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(list_item["likeCount"], 1)
         self.assertEqual(list_item["commentCount"], 1)
 
+    def test_posts_ai_copywriting_generate_and_polish(self):
+        token = self.login()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        generate_response = self.client.post(
+            "/api/v1/posts/ai-copywriting",
+            headers=headers,
+            json={"mode": "generate", "imageUrl": "/uploads/ai-copy-source.jpg", "content": ""},
+        )
+        self.assertEqual(generate_response.status_code, 200)
+        generate_body = generate_response.json()
+        self.assertEqual(generate_body["code"], 0)
+        self.assertEqual(generate_body["data"]["mode"], "generate")
+        self.assertTrue(generate_body["data"]["content"])
+        self.assertIn(generate_body["data"]["source"], {"deepseek", "fallback"})
+
+        polish_response = self.client.post(
+            "/api/v1/posts/ai-copywriting",
+            headers=headers,
+            json={
+                "mode": "polish",
+                "imageUrl": "/uploads/ai-copy-source.jpg",
+                "content": "今天看到一只鸟，感觉很可爱",
+            },
+        )
+        self.assertEqual(polish_response.status_code, 200)
+        polish_body = polish_response.json()
+        self.assertEqual(polish_body["code"], 0)
+        self.assertEqual(polish_body["data"]["mode"], "polish")
+        self.assertTrue(polish_body["data"]["content"])
+        self.assertIn(polish_body["data"]["source"], {"deepseek", "fallback"})
+
+    def test_posts_ai_copywriting_polish_requires_content(self):
+        token = self.login()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        response = self.client.post(
+            "/api/v1/posts/ai-copywriting",
+            headers=headers,
+            json={"mode": "polish", "imageUrl": "/uploads/ai-copy-source.jpg", "content": ""},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["code"], 1001)
+
     def test_health(self):
         response = self.client.get("/api/v1/health")
         self.assertEqual(response.status_code, 200)
