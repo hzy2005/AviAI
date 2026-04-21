@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -22,6 +22,12 @@ class CreatePostRequest(BaseModel):
 class CreateCommentRequest(BaseModel):
     content: str = Field(min_length=1, max_length=500)
     parentId: Optional[int] = None
+
+
+class AICopywritingRequest(BaseModel):
+    mode: Literal["generate", "polish"]
+    imageUrl: str = Field(min_length=1, max_length=2048)
+    content: str = Field(default="", max_length=1000)
 
 
 class UpdateBirdRecordRequest(BaseModel):

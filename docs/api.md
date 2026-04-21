@@ -229,3 +229,56 @@
 1. 任何接口字段、状态码、鉴权规则变更，先改 `docs/api.yaml`。  
 2. 再同步更新本文件的“接口总览 + 前端关键契约 + 错误码约定”。  
 3. 以测试为准固化契约（建议维护 `backend/tests/test_api.py` 对应断言）。
+
+## 6. AI Copywriting V2 (2026-04)
+
+`POST /api/v1/posts/ai-copywriting`
+
+### 6.1 Generate Response
+
+- `mode=generate`
+- `data.content` is the final generated copy.
+- `data.source` in `{deepseek_vision, deepseek, fallback}`
+- `data.aiMeta` provides observability:
+  - `mode`
+  - `model`
+  - `elapsedMs`
+  - `retryCount`
+  - `fallback`
+  - `params.text.temperature/maxTokens`
+  - `params.vision.temperature/maxTokens`
+
+### 6.2 Polish Response
+
+- `mode=polish`
+- Returns dual variants:
+  - `data.lite`
+  - `data.enhanced`
+  - `data.defaultVariant = "lite"`
+- Backward compatibility:
+  - `data.content` equals `data.lite` (frontend default render).
+- `data.sources` records per-variant source.
+- `data.aiMeta.variants` records per-variant observability.
+
+### 6.3 Image Upload Before AI Copywriting
+
+- New endpoint: `POST /api/v1/posts/upload-image`
+- Content type: `multipart/form-data`
+- Form field: `image`
+- Success response:
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "imageUrl": "/uploads/20260421_xxx.jpg"
+  }
+}
+```
+
+- Recommended frontend flow:
+1. User selects image (local temp path).
+2. Call `POST /api/v1/posts/upload-image` first and store returned `/uploads/...`.
+3. Call `POST /api/v1/posts/ai-copywriting` with uploaded `imageUrl`.
+4. Call `POST /api/v1/posts` or `PUT /api/v1/posts/{postId}` with uploaded `imageUrl`.
