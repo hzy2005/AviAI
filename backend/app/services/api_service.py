@@ -550,8 +550,27 @@ def _format_vision_facts(facts: Optional[dict]) -> str:
     )
 
 
+def _humanize_bird_name(name: Optional[str]) -> str:
+    value = (name or "").strip()
+    if not value:
+        return "小鸟"
+    lower = value.lower()
+    cn_map = {
+        "indigo bunting": "靛蓝彩鹀",
+        "common kingfisher": "普通翠鸟",
+        "eurasian hoopoe": "戴胜",
+        "mallard": "绿头鸭",
+        "european bee-eater": "黄喉蜂虎",
+        "long-tailed tit": "长尾山雀",
+    }
+    for key, cn in cn_map.items():
+        if key in lower:
+            return cn
+    return value
+
+
 def _build_generate_prompt(image_url: str, bird_hint: Optional[dict]) -> str:
-    bird_name = (bird_hint or {}).get("birdName") or "unknown bird"
+    bird_name = _humanize_bird_name((bird_hint or {}).get("birdName"))
     confidence = float((bird_hint or {}).get("confidence") or 0.0)
     confidence_percent = round(confidence * 100, 1)
     return (
@@ -559,11 +578,12 @@ def _build_generate_prompt(image_url: str, bird_hint: Optional[dict]) -> str:
         "Write Chinese copy in exactly 3 sentences with this fixed order: scene, observation, feeling. "
         "Total length must be 50-90 Chinese characters. "
         "Do not use markdown, hashtags, emojis, or list format. "
-        "Avoid vague cliches such as '太美了', '好可爱', '真的很治愈', '氛围感拉满'. "
+        "Tone must be natural and warm, like a real user sharing a moment. "
+        "Avoid technical/report wording such as 'matching confidence', 'main subject', 'image shows'. "
         "Use concrete visual details from the image including color, posture, and surrounding scene. "
-        "If species hint is available, naturally mention it. "
+        "If species hint is available, mention it naturally in daily Chinese. "
         f"Species hint: {bird_name}. "
-        f"Recognition confidence: {confidence_percent}%. "
+        f"Recognition confidence (for your reference only, avoid explicit percentage in final copy): {confidence_percent}%. "
         f"Image reference: {image_url}."
     )
 
@@ -940,9 +960,37 @@ def _normalize_generate_copy(
 
     return text
 
+def _soften_generate_tone(text: str) -> str:
+    normalized = (text or "").strip()
+    if not normalized:
+        return normalized
+
+    replacements = {
+        "主体特征比较清晰": "样子很清楚",
+        "匹配置信度": "识别把握",
+        "画面里一只": "有一只",
+        "画面中的": "这只",
+        "视觉重心": "目光会先落在",
+        "整张图显得": "整幅画面",
+    }
+    for src, dst in replacements.items():
+        normalized = normalized.replace(src, dst)
+
+    for phrase in ["匹配置信度约为", "识别置信度", "confidence"]:
+        if phrase in normalized:
+            normalized = re.sub(r'，?[^，。]*' + re.escape(phrase) + r'[^，。]*', '', normalized)
+
+    normalized = re.sub(r'，+', '，', normalized)
+    normalized = re.sub(r'。+', '。', normalized)
+    normalized = normalized.strip('，')
+    if normalized and normalized[-1] not in '。！？!?':
+        normalized += '。'
+    return normalized
+
+
 def _ensure_generate_mentions_bird(content: str, bird_hint: Optional[dict]) -> str:
-    bird_name = (bird_hint or {}).get("birdName")
-    if not bird_name:
+    bird_name = _humanize_bird_name((bird_hint or {}).get("birdName"))
+    if not bird_name or bird_name == "小鸟":
         return content
 
     normalized = (content or "").strip()
@@ -951,9 +999,8 @@ def _ensure_generate_mentions_bird(content: str, bird_hint: Optional[dict]) -> s
     if bird_name in normalized:
         return normalized
 
-    confidence = float((bird_hint or {}).get("confidence") or 0.0)
-    confidence_percent = round(confidence * 100, 1)
-    return f"{normalized}，主角大概率是{bird_name}（识别置信度{confidence_percent}%）"
+    return f"{normalized}，主角像是{bird_name}"        if normalized[-1] not in "。！？!?"         else f"{normalized[:-1]}，主角像是{bird_name}。"
+
 
 def _fallback_polish_copy(content: str, bird_hint: Optional[dict]) -> str:
     polished = " ".join(content.split()).strip()
@@ -1144,6 +1191,10 @@ def generate_post_copywriting(
         "希望大家喜欢",
         "作为AI",
         "仅供参考",
+        "匹配置信度",
+        "主体特征",
+        "画面里一只",
+        "图像显示",
     ]
     if normalized_mode == "generate":
         vision_meta = _call_with_quality_retry_meta(
@@ -1218,6 +1269,7 @@ def generate_post_copywriting(
             visual_hint=ai_meta["visualHint"],
             vision_facts=vision_facts,
         )
+        output_content = _soften_generate_tone(output_content)
     else:
         variants, lite_source, polish_meta = _generate_polish_variants(
             original_content=normalized_content,
