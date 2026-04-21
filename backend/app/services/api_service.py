@@ -1,13 +1,13 @@
 ﻿from datetime import datetime, timezone
+import base64
 import json
+import mimetypes
 from pathlib import Path
 from typing import Optional
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 from uuid import uuid4
 import threading
-
-from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from PIL import Image, UnidentifiedImageError
 import torch
@@ -504,6 +504,82 @@ def _call_deepseek_chat(prompt: str) -> Optional[str]:
         return None
 
 
+def _resolve_image_input_for_vision(image_url: str) -> Optional[str]:
+    normalized = (image_url or "").strip()
+    if not normalized:
+        return None
+
+    if normalized.startswith(("http://", "https://", "data:image/")):
+        return normalized
+
+    local_path: Optional[Path] = None
+    if normalized.startswith("/uploads/"):
+        local_path = UPLOADS_DIR / Path(normalized).name
+    else:
+        candidate = Path(normalized)
+        if candidate.is_file():
+            local_path = candidate
+
+    if not local_path or not local_path.exists():
+        return None
+
+    mime_type, _ = mimetypes.guess_type(str(local_path))
+    mime = mime_type or "image/jpeg"
+    encoded = base64.b64encode(local_path.read_bytes()).decode("utf-8")
+    return f"data:{mime};base64,{encoded}"
+
+
+def _call_deepseek_vision_chat(prompt: str, image_url: str) -> Optional[str]:
+    api_key = (settings.deepseek_api_key or "").strip()
+    if not api_key:
+        return None
+
+    vision_input = _resolve_image_input_for_vision(image_url)
+    if not vision_input:
+        return None
+
+    base_url = (settings.deepseek_base_url or "").rstrip("/")
+    if not base_url:
+        return None
+
+    req = urllib_request.Request(
+        f"{base_url}/chat/completions",
+        data=json.dumps(
+            {
+                "model": settings.deepseek_vision_model or settings.deepseek_model,
+                "messages": [
+                    {"role": "system", "content": "You are a helpful bird caption assistant."},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": vision_input}},
+                        ],
+                    },
+                ],
+                "temperature": 0.7,
+                "max_tokens": 280,
+            }
+        ).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+    )
+
+    try:
+        with urllib_request.urlopen(req, timeout=settings.deepseek_timeout_seconds) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        content = (
+            payload.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
+        return content or None
+    except (urllib_error.HTTPError, urllib_error.URLError, TimeoutError, json.JSONDecodeError):
+        return None
 def _fallback_generate_copy(bird_hint: Optional[dict]) -> str:
     bird_name = (bird_hint or {}).get("birdName")
     confidence = float((bird_hint or {}).get("confidence") or 0.0)
@@ -579,7 +655,18 @@ def generate_post_copywriting(
         prompt = _build_polish_prompt(normalized_content, normalized_image_url, bird_hint)
         fallback_content = _fallback_polish_copy(normalized_content, bird_hint)
 
-    ai_content = _call_deepseek_chat(prompt)
+    ai_content = None
+    ai_source = "fallback"
+    if normalized_mode == "generate":
+        ai_content = _call_deepseek_vision_chat(prompt, normalized_image_url)
+        if ai_content:
+            ai_source = "deepseek_vision"
+
+    if not ai_content:
+        ai_content = _call_deepseek_chat(prompt)
+        if ai_content:
+            ai_source = "deepseek"
+
     output_content = ai_content or fallback_content
     if normalized_mode == "generate":
         output_content = _ensure_generate_mentions_bird(output_content, bird_hint)
@@ -587,7 +674,7 @@ def generate_post_copywriting(
     return {
         "mode": normalized_mode,
         "content": output_content,
-        "source": "deepseek" if ai_content else "fallback",
+        "source": ai_source,
     }, None
 
 

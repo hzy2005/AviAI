@@ -407,7 +407,7 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(generate_body["code"], 0)
         self.assertEqual(generate_body["data"]["mode"], "generate")
         self.assertTrue(generate_body["data"]["content"])
-        self.assertIn(generate_body["data"]["source"], {"deepseek", "fallback"})
+        self.assertIn(generate_body["data"]["source"], {"deepseek_vision", "deepseek", "fallback"})
 
         polish_response = self.client.post(
             "/api/v1/posts/ai-copywriting",
