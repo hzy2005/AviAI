@@ -8,6 +8,14 @@ function create(data) {
   });
 }
 
+function aiCopywriting(data) {
+  return apiClient({
+    url: "/api/v1/posts/ai-copywriting",
+    method: "POST",
+    data
+  });
+}
+
 function list(params = {}) {
   const { page = 1, pageSize = 10, keyword = "" } = params;
   const query = `page=${page}&pageSize=${pageSize}&keyword=${encodeURIComponent(keyword)}`;
@@ -54,6 +62,7 @@ function comment(postId, data) {
 
 module.exports = {
   create,
+  aiCopywriting,
   list,
   detail,
   update,

@@ -293,6 +293,33 @@
   gap: 10rpx;
 }
 
+.create-actions-top {
+  margin-top: 14rpx;
+  display: flex;
+  gap: 10rpx;
+}
+
+.create-actions-bottom {
+  margin-top: 10rpx;
+  display: flex;
+  width: 100%;
+}
+
+.create-action-btn {
+  flex: 1;
+}
+
+.create-publish-btn {
+  flex: 1;
+  width: auto;
+  margin: 0;
+}
+
+.ai-btn {
+  background: #dbeee4;
+  color: #1c4f37;
+}
+
 .small-btn {
   flex: 1;
   height: 68rpx;

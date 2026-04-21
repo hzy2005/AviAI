@@ -55,6 +55,7 @@
 | Birds | POST | `/birds/recognize` | 是 | 上传图片识别 |
 | Birds | GET | `/birds/records` | 是 | 识别记录分页 |
 | Posts | POST | `/posts` | 是 | 发布动态 |
+| Posts | POST | `/posts/ai-copywriting` | 是 | AI 生成/润色社区文案 |
 | Posts | GET | `/posts` | 否 | 动态分页列表（支持 keyword） |
 | Posts | GET | `/posts/{postId}` | 否 | 动态详情 |
 | Posts | PUT | `/posts/{postId}` | 是 | 更新动态（仅作者） |
@@ -144,9 +145,80 @@
 }
 ```
 
-### 4.4 Posts（写接口错误码）
+### 4.4 Posts（AI 文案辅助）
+
+`POST /api/v1/posts/ai-copywriting` 用于社区发帖前的 AI 文案辅助，服务端内部调用 DeepSeek API 生成结果；前端拿到返回文案后，仍通过 `POST /api/v1/posts` 完成最终发布。
+
+支持两种模式：
+
+- `generate`：用户仅上传图片，AI 基于图片生成社区文案
+- `polish`：用户上传图片并填写原始文案，AI 对文案进行润色
+
+请求体：
+
+```json
+{
+  "mode": "generate",
+  "imageUrl": "/uploads/post_001.jpg",
+  "content": ""
+}
+```
+
+字段约定：
+
+- `mode`：必填，枚举值为 `generate` / `polish`
+- `imageUrl`：必填，用户准备发布的鸟类图片地址
+- `content`：`polish` 模式必填，表示用户原始文案；`generate` 模式可为空字符串
+
+返回体 `data` 字段固定为：
+
+```json
+{
+  "mode": "generate",
+  "content": "今天在湿地偶遇一只优雅的白鹭，安静伫立在浅水边，阳光洒在羽毛上特别好看。第一次这么近距离观察它，忍不住记录下来和大家分享。",
+  "source": "deepseek"
+}
+```
+
+`generate` 模式示例：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "mode": "generate",
+    "content": "今天在湿地偶遇一只优雅的白鹭，安静伫立在浅水边，阳光洒在羽毛上特别好看。第一次这么近距离观察它，忍不住记录下来和大家分享。",
+    "source": "deepseek"
+  }
+}
+```
+
+`polish` 模式示例：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "mode": "polish",
+    "content": "今天在公园拍到一只特别灵动的小鸟，停在枝头时神态很安静，羽色在阳光下也很漂亮，分享给大家看看。",
+    "source": "deepseek"
+  }
+}
+```
+
+推荐调用流程：
+
+1. 前端先完成图片上传，拿到 `imageUrl`
+2. 用户未填写文案时，调用 `POST /api/v1/posts/ai-copywriting` 且 `mode=generate`
+3. 用户已填写文案时，调用 `POST /api/v1/posts/ai-copywriting` 且 `mode=polish`
+4. 前端将 AI 返回的 `content` 回填到发帖输入框，确认后继续调用 `POST /api/v1/posts`
+
+### 4.5 Posts（写接口错误码）
 
 - `POST /posts`：`401`（未登录）
+- `POST /posts/ai-copywriting`：`400/401/500`
 - `PUT /posts/{postId}`：`401/403/404`
 - `DELETE /posts/{postId}`：`401/403/404`
 - `POST /posts/{postId}/like`：`401/404/409`（重复点赞为 `409 + 1009`）
