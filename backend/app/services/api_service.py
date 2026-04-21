@@ -168,7 +168,7 @@ def logout_user():
 
 def get_user_profile(current_user: Optional[dict]):
     if not current_user:
-        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
+        return None, (1002, "未登录或 Token 无效", 401)
 
     return {
         "id": current_user["id"],
@@ -270,7 +270,7 @@ def recognize_bird_for_user(
     file_bytes: Optional[bytes],
 ):
     if not current_user:
-        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
+        return None, (1002, "未登录或 Token 无效", 401)
     if not filename:
         return None, (1006, "Invalid upload file.", 400)
     if not file_bytes:
@@ -303,12 +303,12 @@ def recognize_bird_for_user(
 
             return _serialize_bird_record_item(record), None
     except SQLAlchemyError:
-        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
+        return None, (1005, "服务内部错误", 500)
 
 
 def list_bird_records(current_user: Optional[dict], page: int, page_size: int):
     if not current_user:
-        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
+        return None, (1002, "未登录或 Token 无效", 401)
 
     try:
         with SessionLocal() as db:
@@ -332,12 +332,12 @@ def list_bird_records(current_user: Optional[dict], page: int, page_size: int):
                 "pageSize": page_size,
             }, None
     except SQLAlchemyError:
-        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
+        return None, (1005, "服务内部错误", 500)
 
 
 def get_bird_record_detail(current_user: Optional[dict], record_id: int):
     if not current_user:
-        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
+        return None, (1002, "未登录或 Token 无效", 401)
 
     try:
         with SessionLocal() as db:
@@ -348,12 +348,12 @@ def get_bird_record_detail(current_user: Optional[dict], record_id: int):
                 return None, (1003, "Forbidden.", 403)
             return _serialize_bird_record_item(record), None
     except SQLAlchemyError:
-        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
+        return None, (1005, "服务内部错误", 500)
 
 
 def update_bird_record(current_user: Optional[dict], record_id: int, bird_name: str):
     if not current_user:
-        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
+        return None, (1002, "未登录或 Token 无效", 401)
 
     try:
         with SessionLocal() as db:
@@ -367,12 +367,12 @@ def update_bird_record(current_user: Optional[dict], record_id: int, bird_name: 
             db.refresh(record)
             return _serialize_bird_record_item(record), None
     except SQLAlchemyError:
-        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
+        return None, (1005, "服务内部错误", 500)
 
 
 def delete_bird_record(current_user: Optional[dict], record_id: int):
     if not current_user:
-        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
+        return None, (1002, "未登录或 Token 无效", 401)
 
     try:
         with SessionLocal() as db:
@@ -385,12 +385,12 @@ def delete_bird_record(current_user: Optional[dict], record_id: int):
             db.commit()
             return {"recordId": record_id, "deleted": True}, None
     except SQLAlchemyError:
-        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
+        return None, (1005, "服务内部错误", 500)
 
 
 def create_post(current_user: Optional[dict], content: str, image_url: Optional[str]):
     if not current_user:
-        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
+        return None, (1002, "未登录或 Token 无效", 401)
 
     try:
         with SessionLocal() as db:
@@ -406,7 +406,7 @@ def create_post(current_user: Optional[dict], content: str, image_url: Optional[
             db.refresh(post)
             return {"postId": post.id}, None
     except SQLAlchemyError:
-        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
+        return None, (1005, "服务内部错误", 500)
 
 def upload_post_image(
     current_user: Optional[dict],
@@ -1338,7 +1338,7 @@ def list_posts(page: int, page_size: int, keyword: Optional[str] = None):
                 "pageSize": page_size,
             }, None
     except SQLAlchemyError:
-        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
+        return None, (1005, "服务内部错误", 500)
 
 
 def get_post_detail(post_id: int):
@@ -1354,12 +1354,12 @@ def get_post_detail(post_id: int):
 
             return _serialize_post_item(post, _serialize_user_model(user)), None
     except SQLAlchemyError:
-        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
+        return None, (1005, "服务内部错误", 500)
 
 
 def update_post(current_user: Optional[dict], post_id: int, content: str, image_url: Optional[str]):
     if not current_user:
-        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
+        return None, (1002, "未登录或 Token 无效", 401)
 
     try:
         with SessionLocal() as db:
@@ -1375,12 +1375,12 @@ def update_post(current_user: Optional[dict], post_id: int, content: str, image_
             db.commit()
             return {"postId": post_id}, None
     except SQLAlchemyError:
-        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
+        return None, (1005, "服务内部错误", 500)
 
 
 def delete_post(current_user: Optional[dict], post_id: int):
     if not current_user:
-        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
+        return None, (1002, "未登录或 Token 无效", 401)
 
     try:
         with SessionLocal() as db:
@@ -1394,12 +1394,12 @@ def delete_post(current_user: Optional[dict], post_id: int):
             db.commit()
             return {"postId": post_id, "deleted": True}, None
     except SQLAlchemyError:
-        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
+        return None, (1005, "服务内部错误", 500)
 
 
 def like_post(current_user: Optional[dict], post_id: int):
     if not current_user:
-        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
+        return None, (1002, "未登录或 Token 无效", 401)
 
     try:
         with SessionLocal() as db:
@@ -1414,7 +1414,7 @@ def like_post(current_user: Optional[dict], post_id: int):
                 )
             )
             if existing:
-                return None, (1009, "璧勬簮鍐茬獊", 409)
+                return None, (1009, "资源冲突", 409)
 
             like = Like(user_id=current_user["id"], post_id=post_id)
             db.add(like)
@@ -1423,14 +1423,14 @@ def like_post(current_user: Optional[dict], post_id: int):
             db.commit()
             return {"postId": post_id, "liked": True}, None
     except IntegrityError:
-        return None, (1009, "璧勬簮鍐茬獊", 409)
+        return None, (1009, "资源冲突", 409)
     except SQLAlchemyError:
-        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
+        return None, (1005, "服务内部错误", 500)
 
 
 def create_comment(current_user: Optional[dict], post_id: int, content: str, parent_id: Optional[int]):
     if not current_user:
-        return None, (1002, "鏈櫥褰曟垨 Token 鏃犳晥", 401)
+        return None, (1002, "未登录或 Token 无效", 401)
 
     try:
         with SessionLocal() as db:
@@ -1441,7 +1441,7 @@ def create_comment(current_user: Optional[dict], post_id: int, content: str, par
             if parent_id is not None:
                 parent_comment = db.get(Comment, parent_id)
                 if not parent_comment or parent_comment.post_id != post_id:
-                    return None, (1004, "鐖惰瘎璁轰笉瀛樺湪", 404)
+                    return None, (1004, "父评论不存在", 404)
 
             comment = Comment(
                 post_id=post_id,
@@ -1456,5 +1456,5 @@ def create_comment(current_user: Optional[dict], post_id: int, content: str, par
             db.refresh(comment)
             return {"commentId": comment.id}, None
     except SQLAlchemyError:
-        return None, (1005, "鏈嶅姟鍐呴儴閿欒", 500)
+        return None, (1005, "服务内部错误", 500)
 
