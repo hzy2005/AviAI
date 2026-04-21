@@ -430,6 +430,10 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(polish_body["data"]["mode"], "polish")
         self.assertTrue(polish_body["data"]["content"])
         self.assertIn(polish_body["data"]["source"], {"deepseek", "fallback"})
+        polished_content = polish_body["data"]["content"]
+        self.assertIn("鸟", polished_content)
+        self.assertNotIn("```", polished_content)
+        self.assertNotIn("#", polished_content)
 
     def test_posts_ai_copywriting_polish_requires_content(self):
         token = self.login()

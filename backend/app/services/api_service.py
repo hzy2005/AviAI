@@ -455,10 +455,12 @@ def _build_polish_prompt(content: str, image_url: str, bird_hint: Optional[dict]
     bird_name = (bird_hint or {}).get("birdName") or "unknown bird"
     return (
         "You are an assistant for a bird community app. "
-        "Polish the following Chinese post copy while keeping original meaning. "
-        "Output only polished text, no explanation, no markdown, no hashtags. "
-        "Keep it concise and natural.\n"
-        f"Known bird hint: {bird_name}\n"
+        "Rewrite and polish the following Chinese post with strict meaning preservation. "
+        "Rules: keep original facts unchanged, do not add new facts, people, time, place, or events; "
+        "improve fluency, readability, and emotional tension; keep concise and natural style. "
+        "Return plain text only. No explanation, no markdown, no hashtags, no bullets, no quotes. "
+        "If species hint conflicts with the original text, trust the original text.\n"
+        f"Species hint (reference only): {bird_name}\n"
         f"Image reference: {image_url}\n"
         f"Original copy: {content}"
     )
@@ -676,6 +678,22 @@ def _fallback_polish_copy(content: str, bird_hint: Optional[dict]) -> str:
     return polished
 
 
+def _normalize_polish_copy(content: str, original_content: str) -> str:
+    normalized = (content or "").strip()
+    normalized = re.sub(r"^```[a-zA-Z]*\s*", "", normalized)
+    normalized = re.sub(r"\s*```$", "", normalized)
+    normalized = normalized.replace("#", "").replace("*", "").replace("`", "")
+    normalized = normalized.strip().strip('"').strip("'")
+
+    if not normalized:
+        normalized = (original_content or "").strip()
+
+    anchors = re.findall(r"[A-Za-z0-9]+", original_content or "")
+    if anchors and not any(anchor in normalized for anchor in anchors):
+        normalized = (original_content or "").strip()
+
+    return normalized
+
 def generate_post_copywriting(
     current_user: Optional[dict],
     mode: str,
@@ -720,6 +738,8 @@ def generate_post_copywriting(
     if normalized_mode == "generate":
         output_content = _ensure_generate_mentions_bird(output_content, bird_hint)
         output_content = _normalize_generate_copy(output_content, bird_hint)
+    else:
+        output_content = _normalize_polish_copy(output_content, normalized_content)
 
     return {
         "mode": normalized_mode,
