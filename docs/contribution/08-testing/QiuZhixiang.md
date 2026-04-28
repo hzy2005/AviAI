@@ -8,19 +8,21 @@
 
 - `frontend/src/__tests__/page-interactions.test.js`
 - `frontend/src/__tests__/api-mock.test.js`
+- `frontend/src/__tests__/coverage-boost.test.js`
 - `frontend/src/__tests__/helpers/test-utils.js`
 
 ### 测试清单
 
-- [x] 组件渲染 / 交互测试（12 个）
-- [x] Mock API 测试（8 个，含失败场景）
+- [x] 组件渲染 / 交互测试（27 个）
+- [x] Mock API / 请求 / 工具测试（20 个，含失败场景）
 - [x] 覆盖登录、注册、社区发帖、AI 文案辅助、识别结果发布等核心前端流程
 
 ### 覆盖率
 
 - 运行命令：`npm test`
-- 覆盖率命令：`npm run test:coverage`
-- 核心模块覆盖率：已通过 Node 内置 coverage 输出进行统计，重点覆盖 `pages/login`、`pages/register`、`pages/community`、`pages/recognize`、`src/api`、`utils/mock-api`
+- 覆盖率命令：`npm test -- --coverage`
+- 核心模块覆盖率：`92.77%`（基于 `frontend/coverage/coverage-summary.json` 的业务代码统计）
+- 重点覆盖模块：`pages/login`、`pages/register`、`pages/community`、`pages/recognize`、`src/api`、`utils/request`、`utils/mock-api`
 
 ### AI 辅助
 
@@ -28,15 +30,15 @@
 - Prompt 示例：`严格参照我的API文档，请帮我完成前端部分的作业任务，不要修改后端的文件。`
 - 补充 Prompt：`我的前端测试文件不是应该放在 frontend/src/__tests__/ 目录下吗，帮我修改移动一下。`
 - 补充 Prompt：`这里我使用你 codex 来作为 AI 辅助测试，请帮我实现前端部分任务，不要修改后端。`
-- AI 生成 + 人工修改的测试数量：20 个
+- AI 生成 + 人工修改的测试数量：47 个
 - 修改过程说明：
   - 先由 AI 基于 `docs/api.md` 生成小程序页面交互测试和 Mock API 测试
   - 再人工确认测试目录改为 `frontend/src/__tests__/`
-  - 最后补充覆盖率脚本、LCOV 产物和 README / Codecov 配置
+  - 最后补充覆盖率脚本、LCOV 产物、README / Codecov 配置，并继续针对低覆盖模块补测到 80% 以上
 
 ## PR 链接
 
-- 本地课程项目开发，暂无独立 PR 链接
+- PR #X: https://github.com/hzy2005/AviAI/pull/38
 
 ## 遇到的问题和解决
 
