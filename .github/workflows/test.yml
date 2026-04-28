@@ -3,7 +3,7 @@ name: Test and upload coverage
 on:
   push:
     branches:
-      - main
+      - master
       - feature/HeZhouyi-backend-test
   pull_request:
 
