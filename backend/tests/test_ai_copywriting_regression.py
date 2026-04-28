@@ -82,7 +82,9 @@ class AICopywritingRegressionTest(unittest.TestCase):
                 "fallback": False,
                 "elapsedMs": 123,
             },
-        ), patch.object(api_service, "_find_recent_bird_hint", return_value={"birdName": "Mallard", "confidence": 0.92}):
+        ), patch.object(api_service, "_is_backend_accessible_image", return_value=True), patch.object(
+            api_service, "_find_recent_bird_hint", return_value={"birdName": "Mallard", "confidence": 0.92}
+        ):
             data, err = api_service.generate_post_copywriting(
                 current_user=user,
                 mode="generate",
@@ -152,7 +154,9 @@ class AICopywritingRegressionTest(unittest.TestCase):
             api_service,
             "_call_with_quality_retry_meta",
             return_value={"content": None, "attempts": 2, "retryCount": 1, "fallback": True, "elapsedMs": 88},
-        ), patch.object(api_service, "_find_recent_bird_hint", return_value={"birdName": "Mallard", "confidence": 0.8}):
+        ), patch.object(api_service, "_is_backend_accessible_image", return_value=True), patch.object(
+            api_service, "_find_recent_bird_hint", return_value={"birdName": "Mallard", "confidence": 0.8}
+        ):
             data, err = api_service.generate_post_copywriting(
                 current_user=user,
                 mode="generate",
