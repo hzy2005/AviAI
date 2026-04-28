@@ -229,3 +229,294 @@ def test_like_post_creates_like_when_not_existing(fake_user):
     assert post.updated_at is not None
     db.add.assert_called_once()
     db.commit.assert_called_once()
+
+
+def test_get_user_profile_returns_profile_for_current_user(fake_user):
+    data, err = api_service.get_user_profile(fake_user)
+
+    assert err is None
+    assert data["id"] == fake_user["id"]
+    assert data["email"] == fake_user["email"]
+
+
+def test_get_user_profile_returns_unauthorized_without_user():
+    data, err = api_service.get_user_profile(None)
+
+    assert data is None
+    assert err[0] == 1002
+    assert err[2] == 401
+
+
+def test_recognize_bird_rejects_missing_and_invalid_upload(fake_user):
+    assert api_service.recognize_bird_for_user(None, "bird.jpg", b"x")[1][0] == 1002
+    assert api_service.recognize_bird_for_user(fake_user, None, b"x")[1][0] == 1006
+    assert api_service.recognize_bird_for_user(fake_user, "bird.jpg", b"")[1][0] == 1006
+    assert api_service.recognize_bird_for_user(fake_user, "bird.gif", b"x")[1][0] == 1006
+
+
+def test_list_bird_records_returns_paginated_items(fake_user):
+    db = MagicMock()
+    record = SimpleNamespace(
+        id=7,
+        bird_name="Mallard",
+        confidence=0.9,
+        image_url="/uploads/bird.jpg",
+        created_at=None,
+    )
+    records_result = MagicMock()
+    records_result.all.return_value = [record]
+    db.scalar.return_value = 1
+    db.scalars.return_value = records_result
+
+    with patch.object(api_service, "SessionLocal", _session_factory(db)):
+        data, err = api_service.list_bird_records(fake_user, page=1, page_size=10)
+
+    assert err is None
+    assert data["total"] == 1
+    assert data["list"][0]["recordId"] == 7
+    db.scalar.assert_called_once()
+    db.scalars.assert_called_once()
+
+
+def test_bird_record_detail_handles_not_found_forbidden_and_success(fake_user):
+    db = MagicMock()
+
+    with patch.object(api_service, "SessionLocal", _session_factory(db)):
+        db.get.return_value = None
+        data, err = api_service.get_bird_record_detail(fake_user, 1)
+        assert data is None
+        assert err[0] == 1004
+
+        db.get.return_value = SimpleNamespace(user_id=999)
+        data, err = api_service.get_bird_record_detail(fake_user, 1)
+        assert data is None
+        assert err[0] == 1003
+
+        db.get.return_value = SimpleNamespace(
+            id=1,
+            user_id=fake_user["id"],
+            bird_name="Mallard",
+            confidence=0.8,
+            image_url="/uploads/a.jpg",
+            created_at=None,
+        )
+        data, err = api_service.get_bird_record_detail(fake_user, 1)
+
+    assert err is None
+    assert data["recordId"] == 1
+
+
+def test_update_bird_record_updates_name_and_commits(fake_user):
+    record = SimpleNamespace(
+        id=2,
+        user_id=fake_user["id"],
+        bird_name="Old",
+        confidence=0.7,
+        image_url="/uploads/a.jpg",
+        created_at=None,
+    )
+    db = MagicMock()
+    db.get.return_value = record
+
+    with patch.object(api_service, "SessionLocal", _session_factory(db)):
+        data, err = api_service.update_bird_record(fake_user, 2, "  New Bird  ")
+
+    assert err is None
+    assert record.bird_name == "New Bird"
+    assert data["birdName"] == "New Bird"
+    db.commit.assert_called_once()
+    db.refresh.assert_called_once_with(record)
+
+
+def test_delete_bird_record_deletes_owned_record(fake_user):
+    record = SimpleNamespace(id=3, user_id=fake_user["id"])
+    db = MagicMock()
+    db.get.return_value = record
+
+    with patch.object(api_service, "SessionLocal", _session_factory(db)):
+        data, err = api_service.delete_bird_record(fake_user, 3)
+
+    assert err is None
+    assert data == {"recordId": 3, "deleted": True}
+    db.delete.assert_called_once_with(record)
+    db.commit.assert_called_once()
+
+
+def test_create_post_creates_post_for_user(fake_user):
+    db = MagicMock()
+
+    def assign_id(post):
+        post.id = 88
+
+    db.refresh.side_effect = assign_id
+
+    with patch.object(api_service, "SessionLocal", _session_factory(db)):
+        data, err = api_service.create_post(fake_user, "hello", "/uploads/post.jpg")
+
+    assert err is None
+    assert data == {"postId": 88}
+    db.add.assert_called_once()
+    db.commit.assert_called_once()
+
+
+def test_list_posts_returns_author_enriched_items():
+    db = MagicMock()
+    post = SimpleNamespace(
+        id=5,
+        user_id=1,
+        content="bird story",
+        image_url=None,
+        like_count=2,
+        comment_count=1,
+        created_at=None,
+        updated_at=None,
+    )
+    user = SimpleNamespace(
+        id=1,
+        username="tester",
+        email="tester@example.com",
+        password_hash="hash",
+        avatar_url="",
+        created_at=None,
+    )
+    posts_result = MagicMock()
+    posts_result.all.return_value = [post]
+    users_result = MagicMock()
+    users_result.all.return_value = [user]
+    db.scalar.return_value = 1
+    db.scalars.side_effect = [posts_result, users_result]
+
+    with patch.object(api_service, "SessionLocal", _session_factory(db)):
+        data, err = api_service.list_posts(page=1, page_size=10, keyword="bird")
+
+    assert err is None
+    assert data["total"] == 1
+    assert data["list"][0]["postId"] == 5
+    assert data["list"][0]["author"]["username"] == "tester"
+
+
+def test_get_post_detail_returns_not_found_or_detail():
+    db = MagicMock()
+
+    with patch.object(api_service, "SessionLocal", _session_factory(db)):
+        db.get.return_value = None
+        data, err = api_service.get_post_detail(404)
+        assert data is None
+        assert err[0] == 1004
+
+        post = SimpleNamespace(
+            id=5,
+            user_id=1,
+            content="bird story",
+            image_url=None,
+            like_count=0,
+            comment_count=0,
+            created_at=None,
+            updated_at=None,
+        )
+        user = SimpleNamespace(
+            id=1,
+            username="tester",
+            email="tester@example.com",
+            password_hash="hash",
+            avatar_url="",
+            created_at=None,
+        )
+        db.get.side_effect = [post, user]
+        data, err = api_service.get_post_detail(5)
+
+    assert err is None
+    assert data["postId"] == 5
+    assert data["author"]["id"] == 1
+
+
+def test_update_post_rejects_forbidden_and_updates_owner(fake_user):
+    db = MagicMock()
+
+    with patch.object(api_service, "SessionLocal", _session_factory(db)):
+        db.get.return_value = SimpleNamespace(id=5, user_id=999)
+        data, err = api_service.update_post(fake_user, 5, "new", None)
+        assert data is None
+        assert err[0] == 1003
+
+        post = SimpleNamespace(id=5, user_id=fake_user["id"], content="old", image_url=None, updated_at=None)
+        db.get.return_value = post
+        data, err = api_service.update_post(fake_user, 5, "new", "/uploads/new.jpg")
+
+    assert err is None
+    assert data == {"postId": 5}
+    assert post.content == "new"
+    assert post.image_url == "/uploads/new.jpg"
+
+
+def test_delete_post_deletes_owner_post(fake_user):
+    post = SimpleNamespace(id=5, user_id=fake_user["id"])
+    db = MagicMock()
+    db.get.return_value = post
+
+    with patch.object(api_service, "SessionLocal", _session_factory(db)):
+        data, err = api_service.delete_post(fake_user, 5)
+
+    assert err is None
+    assert data == {"postId": 5, "deleted": True}
+    db.delete.assert_called_once_with(post)
+    db.commit.assert_called_once()
+
+
+def test_create_comment_handles_parent_not_found_and_success(fake_user):
+    db = MagicMock()
+    post = SimpleNamespace(id=5, comment_count=0, updated_at=None)
+
+    with patch.object(api_service, "SessionLocal", _session_factory(db)):
+        db.get.side_effect = [post, None]
+        data, err = api_service.create_comment(fake_user, 5, "hello", parent_id=99)
+        assert data is None
+        assert err[0] == 1004
+
+        def assign_comment_id(comment):
+            comment.id = 77
+
+        db.get.side_effect = [post]
+        db.refresh.side_effect = assign_comment_id
+        data, err = api_service.create_comment(fake_user, 5, "hello", parent_id=None)
+
+    assert err is None
+    assert data == {"commentId": 77}
+    assert post.comment_count == 1
+    db.add.assert_called()
+    db.commit.assert_called()
+
+
+def test_copywriting_helper_functions_cover_quality_and_formatting():
+    assert api_service._is_quality_passed("long enough content", 8, []) is True
+    assert api_service._is_quality_passed("", 8, []) is False
+    assert api_service._is_quality_passed("short", 20, []) is False
+    assert api_service._is_quality_passed("bad template content", 8, ["template"]) is False
+
+    facts = {
+        "species": "mallard",
+        "mainColor": "green",
+        "location": "water_surface",
+        "action": "swimming",
+        "pose": "side",
+    }
+    formatted = api_service._format_vision_facts(facts)
+    assert "species=mallard" in formatted
+    assert api_service._format_vision_facts(None) == "unknown"
+    assert api_service._humanize_bird_name("Mallard")
+    assert api_service._extract_json_from_text("prefix {\"a\": 1} suffix") == {"a": 1}
+    assert api_service._extract_json_from_text("no json") is None
+
+
+def test_call_with_quality_retry_meta_retries_until_quality_passes():
+    calls = iter(["bad", "this content is long enough"])
+
+    result = api_service._call_with_quality_retry_meta(
+        lambda: next(calls),
+        min_length=10,
+        banned_templates=[],
+    )
+
+    assert result["content"] == "this content is long enough"
+    assert result["retryCount"] == 1
+    assert result["fallback"] is False
