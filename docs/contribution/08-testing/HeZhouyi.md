@@ -63,13 +63,10 @@ TOTAL coverage: 84%
 - OpenAI Codex
 
 ### 使用过的 Prompt
-- “帮我完成 Step 1：搭建测试运行配置”
-- “Step 2：整理测试夹具，提供 FastAPI TestClient、fake_user、自动清理 dependency_overrides”
-- “Step 3：补 8 个 Service 单元测试，要求使用 unittest.mock.patch，不连真实数据库，不调用真实 DeepSeek，不加载真实 torch 模型”
-- “Step 4：补 6 个 API 接口测试，API 测试只验证路由、响应结构、错误码，复杂业务结果通过 patch service 控制”
-- “Step 5：跑覆盖率并补漏，总覆盖率需要超过 80%”
-- “额外接 GitHub Actions + Codecov，在 README 中展示 backend / frontend 覆盖率徽章”
-- “写个人测试贡献说明，记录使用的 Prompt 和修改过程”
+- “Step 1：整理测试夹具，提供 FastAPI TestClient、fake_user、自动清理 dependency_overrides”
+- “Step 2：补 8 个 Service 单元测试，要求使用 unittest.mock.patch，不连真实数据库，不调用真实 DeepSeek，不加载真实 torch 模型”
+- “Step 3：补 6 个 API 接口测试，API 测试只验证路由、响应结构、错误码，复杂业务结果通过 patch service 控制”
+- “Step 4：跑覆盖率并补漏，总覆盖率需要超过 80%”
 
 ### AI 辅助生成的内容
 - 生成 `backend/tests/conftest.py` 中的共享测试夹具，包括 `client`、`fake_user` 和依赖覆盖清理逻辑。
@@ -77,7 +74,6 @@ TOTAL coverage: 84%
 - 生成 `backend/tests/test_api_contract.py` 中的 API 合约测试，覆盖正常返回、参数校验失败、未登录、资源不存在等接口场景。
 - 生成 `backend/tests/test_core_modules.py` 中的核心模块测试，覆盖鉴权、统一响应、schemas 参数校验等内容。
 - 生成 GitHub Actions 和 Codecov 配置，上传 `backend/coverage.xml` 和 `frontend/coverage/lcov.info`，并使用 `backend`、`frontend` 两个 flag 区分覆盖率。
-- 辅助生成 README 覆盖率徽章和本贡献说明文档。
 
 ### 人工审查和修改过程
 - 根据项目实际 API 前缀 `/api/v1`、统一响应结构 `code/message/data`，检查并调整 API 测试断言。
