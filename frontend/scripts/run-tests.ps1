@@ -8,7 +8,8 @@ $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $testFiles = @(
   "src/__tests__/page-interactions.test.js",
-  "src/__tests__/api-mock.test.js"
+  "src/__tests__/api-mock.test.js",
+  "src/__tests__/coverage-boost.test.js"
 )
 
 $coverageRequested = $false
