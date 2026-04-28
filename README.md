@@ -1,5 +1,8 @@
 # AviAI
 
+[![Backend Coverage](https://codecov.io/gh/hzy2005/AviAI/branch/main/graph/badge.svg?flag=backend)](https://codecov.io/gh/hzy2005/AviAI)
+[![Frontend Coverage](https://codecov.io/gh/hzy2005/AviAI/branch/main/graph/badge.svg?flag=frontend)](https://codecov.io/gh/hzy2005/AviAI)
+
 ## 团队成员
 
 | 姓名   | 学号       | 分工         |

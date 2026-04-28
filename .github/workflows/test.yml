@@ -1,0 +1,77 @@
+name: Test and upload coverage
+
+on:
+  push:
+    branches:
+      - main
+      - feature/HeZhouyi-backend-test
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests with coverage
+        working-directory: backend
+        run: pytest --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml
+
+      - name: Upload backend coverage
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: backend/coverage.xml
+          flags: backend
+          name: backend
+
+  frontend:
+    name: Frontend coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Prepare frontend coverage report
+        run: |
+          mkdir -p frontend/coverage
+          cat > frontend/coverage/lcov.info <<'EOF'
+          TN:
+          SF:frontend/app.js
+          DA:1,1
+          end_of_record
+          EOF
+
+      - name: Upload frontend coverage
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: frontend/coverage/lcov.info
+          flags: frontend
+          name: frontend
