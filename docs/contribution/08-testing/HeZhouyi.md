@@ -57,16 +57,37 @@ TOTAL coverage: 84%
 - 前端 Codecov flag：`frontend`
 - README 顶部已添加 `Backend Coverage` 和 `Frontend Coverage` 两个徽章。
 
-## AI 辅助
-- 使用工具：Codex
-- Prompt 示例：
-  - “帮我完成 Step 2：整理测试夹具”
-  - “Step 3：补 8 个 Service 单元测试”
-  - “Step 4：补 6 个 API 接口测试”
-  - “测试覆盖率需要超80%”
-  - “额外接 GitHub Actions + Codecov”
-- AI 生成测试数量：主要辅助生成 Service、API、Core 模块测试和 Codecov CI 配置。
-- 人工修改内容：根据项目实际接口、错误码、Mock 目标、Windows 本地权限问题和覆盖率结果，对测试断言、fixture、CI 上传路径和 README 徽章进行调整。
+## AI 辅助测试记录
+
+### 使用的 AI 工具
+- OpenAI Codex
+
+### 使用过的 Prompt
+- “Step 1：整理测试夹具，提供 FastAPI TestClient、fake_user、自动清理 dependency_overrides”
+- “Step 2：补 8 个 Service 单元测试，要求使用 unittest.mock.patch，不连真实数据库，不调用真实 DeepSeek，不加载真实 torch 模型”
+- “Step 3：补 6 个 API 接口测试，API 测试只验证路由、响应结构、错误码，复杂业务结果通过 patch service 控制”
+- “Step 4：跑覆盖率并补漏，总覆盖率需要超过 80%”
+
+### AI 辅助生成的内容
+- 生成 `backend/tests/conftest.py` 中的共享测试夹具，包括 `client`、`fake_user` 和依赖覆盖清理逻辑。
+- 生成 `backend/tests/test_services.py` 中的 Service 单元测试，覆盖注册、登录、上传图片、AI 文案、点赞、评论、鸟类识别记录等业务函数。
+- 生成 `backend/tests/test_api_contract.py` 中的 API 合约测试，覆盖正常返回、参数校验失败、未登录、资源不存在等接口场景。
+- 生成 `backend/tests/test_core_modules.py` 中的核心模块测试，覆盖鉴权、统一响应、schemas 参数校验等内容。
+- 生成 GitHub Actions 和 Codecov 配置，上传 `backend/coverage.xml` 和 `frontend/coverage/lcov.info`，并使用 `backend`、`frontend` 两个 flag 区分覆盖率。
+
+### 人工审查和修改过程
+- 根据项目实际 API 前缀 `/api/v1`、统一响应结构 `code/message/data`，检查并调整 API 测试断言。
+- 根据真实 service 函数返回的错误码，修正测试中的期望值，例如 `1001` 参数错误、`1002` 未登录、`1004` 资源不存在、`1009` 冲突。
+- 检查所有 Mock 目标，确保测试不会连接真实 MySQL、不会请求真实 DeepSeek、不会加载真实 torch 模型。
+- 运行 `pytest --cov=app --cov-report=html --cov-report=term-missing`，根据覆盖率缺口继续补充低成本分支测试。
+- 发现 CI 环境缺少 `httpx` 后，人工确认 FastAPI `TestClient` 依赖该包，并补充到 `backend/requirements.txt`。
+- 发现主分支是 `master` 而不是 `main` 后，修正 README 徽章和 GitHub Actions 触发分支。
+- 对 Codecov 页面结果进行核对，确认 backend flag 覆盖率为 83.81%，满足后端覆盖率要求。
+
+### AI 生成与人工修改的比例说明
+- AI 辅助生成了测试框架、测试用例初稿、CI 配置和文档初稿。
+- 人工负责确认项目真实接口、错误码、依赖关系、覆盖率结果和 CI 失败原因，并完成最终修正。
+- 最终提交前均通过本地测试和 GitHub Actions 检查。
 
 ## PR 链接
 - 当前分支：`feature/HeZhouyi-backend-test`
