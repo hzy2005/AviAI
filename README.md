@@ -1,5 +1,8 @@
 # AviAI
 
+[![Backend Coverage](https://codecov.io/gh/hzy2005/AviAI/branch/master/graph/badge.svg?flag=backend)](https://codecov.io/gh/hzy2005/AviAI)
+[![Frontend Coverage](https://codecov.io/gh/hzy2005/AviAI/branch/master/graph/badge.svg?flag=frontend)](https://codecov.io/gh/hzy2005/AviAI)
+
 ## 团队成员
 
 | 姓名   | 学号       | 分工         |
@@ -24,3 +27,20 @@
 
 ## Figma链接
 - https://www.figma.com/design/Uv5JLhnpF13kKVHNhKPQRM/AviAI-UI?node-id=0-1&t=yDerZ4QUSjfFUZdV-1
+
+## 测试与覆盖率
+
+- 前端测试命令：`cd frontend && npm test`
+- 前端覆盖率命令：`cd frontend && npm test -- --coverage`
+- 前端覆盖率产物：
+  - `frontend/coverage/term-report.txt`
+  - `frontend/coverage/lcov.info`
+  - `frontend/coverage/coverage-summary.json`
+
+## Codecov 说明
+
+- 前端 GitHub Actions 工作流文件：`.github/workflows/frontend-coverage.yml`
+- 上传前请在 GitHub 仓库 Secrets 中配置 `CODECOV_TOKEN`
+- 当前 README 顶部已预留前后端两个独立 flag 徽章：
+  - `backend`
+  - `frontend`

@@ -55,6 +55,9 @@ desktop.ini
 # Test artifacts
 .nyc_output/
 .pytest_cache/
+pytest-cache-files-*/
+.coverage
+htmlcov/
 
 # Package manager stores
 .pnpm-store/
