@@ -105,7 +105,7 @@ function getStorageSyncSafe(key) {
     if (typeof wx !== "undefined" && typeof wx.getStorageSync === "function") {
       return wx.getStorageSync(key);
     }
-  } catch (error) {}
+  } catch {}
   return null;
 }
 
@@ -114,7 +114,7 @@ function setStorageSyncSafe(key, value) {
     if (typeof wx !== "undefined" && typeof wx.setStorageSync === "function") {
       wx.setStorageSync(key, value);
     }
-  } catch (error) {}
+  } catch {}
 }
 
 function getFileSystemManagerSafe() {
@@ -122,7 +122,7 @@ function getFileSystemManagerSafe() {
     if (typeof wx !== "undefined" && typeof wx.getFileSystemManager === "function") {
       return wx.getFileSystemManager();
     }
-  } catch (error) {}
+  } catch {}
   return null;
 }
 
@@ -131,7 +131,7 @@ function getStateFilePath() {
     if (typeof wx !== "undefined" && wx.env && wx.env.USER_DATA_PATH) {
       return `${wx.env.USER_DATA_PATH}/${MOCK_STATE_FILENAME}`;
     }
-  } catch (error) {}
+  } catch {}
   return "";
 }
 
@@ -149,7 +149,7 @@ function readStateFromFile() {
     }
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === "object" ? parsed : null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -163,7 +163,7 @@ function writeStateToFile(state) {
 
   try {
     fs.writeFileSync(filePath, JSON.stringify(state, null, 2), "utf8");
-  } catch (error) {}
+  } catch {}
 }
 
 function getCurrentStateSnapshot() {

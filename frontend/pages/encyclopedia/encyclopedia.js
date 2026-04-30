@@ -18,7 +18,7 @@ function withBirdThumb(item, index) {
   };
 }
 
-function buildRecordThumb(item, index) {
+function buildRecordThumb(item) {
   const url = String(item.imageUrl || "");
   if (!url) {
     return "";
@@ -109,14 +109,14 @@ Page({
         }
         return acc;
       }, {});
-      const list = (res.data.list || []).map((item, index) => ({
+      const list = (res.data.list || []).map((item) => ({
         ...item,
         confidenceText: toPercent(item.confidence),
         createdAtText: formatDateTime(item.createdAt),
         thumbUrl:
           recordImageMap[String(item.recordId)] ||
           previousThumbMap[String(item.recordId)] ||
-          buildRecordThumb(item, index)
+          buildRecordThumb(item)
       }));
       this.setData({ recordList: list });
     } catch (error) {
