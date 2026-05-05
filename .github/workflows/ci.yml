@@ -25,7 +25,7 @@ jobs:
       - run: pip install -r backend/requirements.txt pytest coverage ruff
 
       - run: ruff check backend/
-      - run: coverage run -m pytest backend/tests -c backend/pytest.ini && coverage xml
+      - run: pytest backend/tests -c backend/pytest.ini --cov=app --cov-report=term-missing --cov-report=xml
 
       - uses: codecov/codecov-action@v4
         with:
