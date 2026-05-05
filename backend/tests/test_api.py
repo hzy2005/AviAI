@@ -13,10 +13,10 @@ BACKEND_ROOT = CURRENT_FILE.parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from fastapi.testclient import TestClient
+from fastapi.testclient import TestClient  # noqa: E402
 
-from app.main import app
-from app.mock_data import reset_store
+from app.main import app  # noqa: E402
+from app.mock_data import reset_store  # noqa: E402
 
 
 class ApiTestCase(unittest.TestCase):

@@ -116,7 +116,7 @@ Page({
         currentUserId: res.data.id || null,
         myPosts: this.deriveMyPosts(this.data.posts)
       });
-    } catch (error) {
+    } catch {
       this.setData({
         currentUserId: brief.id || null,
         myPosts: this.deriveMyPosts(this.data.posts)

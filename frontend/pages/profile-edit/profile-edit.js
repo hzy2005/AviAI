@@ -17,7 +17,7 @@ function saveMockStateFile(state) {
     const fs = wx.getFileSystemManager();
     const filePath = `${wx.env.USER_DATA_PATH}/${MOCK_STATE_FILENAME}`;
     fs.writeFileSync(filePath, JSON.stringify(state, null, 2), "utf8");
-  } catch (error) {}
+  } catch {}
 }
 
 function chooseSingleImage() {

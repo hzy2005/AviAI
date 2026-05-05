@@ -66,7 +66,7 @@ if "torchvision.models" not in sys.modules:
     sys.modules["torchvision"] = tv_stub
     sys.modules["torchvision.models"] = models_stub
 
-from app.services import api_service
+from app.services import api_service  # noqa: E402
 
 
 class AICopywritingRegressionTest(unittest.TestCase):

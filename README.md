@@ -1,7 +1,9 @@
 # AviAI
 
-[![Backend Coverage](https://codecov.io/gh/hzy2005/AviAI/branch/master/graph/badge.svg?flag=backend)](https://codecov.io/gh/hzy2005/AviAI)
-[![Frontend Coverage](https://codecov.io/gh/hzy2005/AviAI/branch/master/graph/badge.svg?flag=frontend)](https://codecov.io/gh/hzy2005/AviAI)
+[![CI](https://github.com/hzy2005/AviAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hzy2005/AviAI/actions)
+[![Backend Coverage](https://codecov.io/gh/hzy2005/AviAI/branch/main/graph/badge.svg?flag=backend)](https://codecov.io/gh/hzy2005/AviAI)
+[![Frontend Coverage](https://codecov.io/gh/hzy2005/AviAI/branch/main/graph/badge.svg?flag=frontend)](https://codecov.io/gh/hzy2005/AviAI)
+[![CodeRabbit](https://img.shields.io/coderabbit/prs/github/hzy2005/AviAI)](https://coderabbit.ai/gh/hzy2005/AviAI)
 
 ## 团队成员
 
@@ -39,7 +41,7 @@
 
 ## Codecov 说明
 
-- 前端 GitHub Actions 工作流文件：`.github/workflows/frontend-coverage.yml`
+- GitHub Actions 工作流文件：`.github/workflows/ci.yml`
 - 上传前请在 GitHub 仓库 Secrets 中配置 `CODECOV_TOKEN`
 - 当前 README 顶部已预留前后端两个独立 flag 徽章：
   - `backend`
