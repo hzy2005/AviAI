@@ -41,7 +41,7 @@
 
 ## PR 链接
 
-- PR 链接：待提交后填写
+- PR 链接：https://github.com/hzy2005/AviAI/pull/58
 
 ## CI 运行链接
 
