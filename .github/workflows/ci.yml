@@ -31,6 +31,7 @@ jobs:
       - run: pytest backend/tests -c backend/pytest.ini --cov=app --cov-report=term-missing --cov-report=xml
 
       - uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.12'
         with:
           files: ./coverage.xml
           flags: backend
