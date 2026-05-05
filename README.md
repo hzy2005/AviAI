@@ -1,8 +1,9 @@
 # AviAI
 
-[![CI](https://github.com/hzy2005/AviAI/actions/workflows/ci.yml/badge.svg)](https://github.com/hzy2005/AviAI/actions)
+[![CI](https://github.com/hzy2005/AviAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hzy2005/AviAI/actions)
 [![Backend Coverage](https://codecov.io/gh/hzy2005/AviAI/branch/main/graph/badge.svg?flag=backend)](https://codecov.io/gh/hzy2005/AviAI)
 [![Frontend Coverage](https://codecov.io/gh/hzy2005/AviAI/branch/main/graph/badge.svg?flag=frontend)](https://codecov.io/gh/hzy2005/AviAI)
+[![CodeRabbit](https://img.shields.io/coderabbit/prs/github/hzy2005/AviAI)](https://coderabbit.ai/gh/hzy2005/AviAI)
 
 ## 团队成员
 
