@@ -53,7 +53,7 @@ function getCoverageEntries() {
       let filePath = "";
       try {
         filePath = fileURLToPath(entry.url);
-      } catch (error) {
+      } catch {
         return;
       }
 

@@ -20,7 +20,7 @@ function recognize(filePath) {
         let data = {};
         try {
           data = JSON.parse(res.data || "{}");
-        } catch (error) {
+        } catch {
           data = {};
         }
         if (res.statusCode >= 200 && res.statusCode < 300 && data.code === 0) {

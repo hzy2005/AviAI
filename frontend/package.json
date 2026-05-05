@@ -10,9 +10,9 @@
     "prettier": "^3.8.1"
   },
   "scripts": {
-    "test": "powershell -ExecutionPolicy Bypass -File scripts/run-tests.ps1",
-    "test:coverage": "powershell -ExecutionPolicy Bypass -File scripts/run-tests.ps1 --coverage",
-    "lint": "eslint . --ext .js",
+    "test": "node scripts/run-tests.js",
+    "test:coverage": "node scripts/run-tests.js --coverage",
+    "lint": "eslint . --ext .js --max-warnings 0",
     "lint:fix": "eslint . --ext .js --fix",
     "format": "prettier . --write"
   },

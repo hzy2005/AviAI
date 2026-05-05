@@ -27,7 +27,7 @@ function login(data) {
         if (me && me.data) {
           wx.setStorageSync("userProfile", me.data);
         }
-      } catch (error) {
+      } catch {
         // Keep login successful even if profile sync fails.
       }
     }
