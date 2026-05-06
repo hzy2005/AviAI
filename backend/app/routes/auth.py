@@ -1,6 +1,10 @@
-from fastapi import APIRouter
+from typing import Optional
 
+from fastapi import APIRouter, Depends
+
+from app.core.auth import get_bearer_token
 from app.core.responses import error, success
+from app.routes.deps import get_current_user
 from app.schemas import LoginRequest, RegisterRequest
 from app.services import api_service
 
@@ -24,5 +28,11 @@ def login_user(payload: LoginRequest):
 
 
 @router.post("/logout")
-def logout_user():
-    return success(api_service.logout_user())
+def logout_user(
+    current_user=Depends(get_current_user),
+    token: Optional[str] = Depends(get_bearer_token),
+):
+    data, err = api_service.logout_user(current_user, token)
+    if err:
+        return error(err[0], err[1], err[2])
+    return success(data)

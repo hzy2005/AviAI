@@ -6,6 +6,7 @@ alembic==1.14.0
 PyMySQL==1.1.1
 pydantic-settings==2.6.1
 cryptography>=43.0.0
+bcrypt>=4.2.0
 Pillow==10.4.0
 torch>=2.3.0
 torchvision>=0.18.0

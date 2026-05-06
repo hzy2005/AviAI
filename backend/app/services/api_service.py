@@ -17,7 +17,14 @@ import torch
 import torch.nn.functional as F
 from torchvision.models import ResNet18_Weights, resnet18
 
-from app.core.auth import create_access_token, decode_access_token, hash_password, verify_password
+from app.core.auth import (
+    create_access_token,
+    decode_access_token,
+    hash_password,
+    password_needs_rehash,
+    revoke_access_token,
+    verify_password,
+)
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.bird_record import BirdRecord
@@ -153,6 +160,11 @@ def login_user(email: str, password: str):
             if not user or not verify_password(password, user.password_hash):
                 return None, (1002, "Invalid email or password", 401)
 
+            if password_needs_rehash(user.password_hash):
+                user.password_hash = hash_password(password)
+                db.commit()
+                db.refresh(user)
+
             user_dict = _serialize_user_model(user)
             return {
                 "token": create_access_token(user_dict["id"]),
@@ -162,8 +174,14 @@ def login_user(email: str, password: str):
         return None, (1005, "Database error", 500)
 
 
-def logout_user():
-    return {"success": True}
+def logout_user(current_user: Optional[dict], token: Optional[str]):
+    if not current_user or not token:
+        return None, (1002, "未登录或 Token 无效", 401)
+
+    if not revoke_access_token(token):
+        return None, (1002, "未登录或 Token 无效", 401)
+
+    return {"success": True}, None
 
 
 def get_user_profile(current_user: Optional[dict]):

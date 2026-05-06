@@ -585,7 +585,12 @@ def test_user_lookup_login_and_logout_cover_success_paths():
         "username": "tester",
         "avatarUrl": "/avatar.png",
     }
-    assert api_service.logout_user() == {"success": True}
+    with patch.object(api_service, "revoke_access_token", return_value=True) as mock_revoke:
+        data, err = api_service.logout_user({"id": 3}, "valid-token")
+
+    assert err is None
+    assert data == {"success": True}
+    mock_revoke.assert_called_once_with("valid-token")
 
     with patch.object(api_service, "SessionLocal", _session_factory(db)), patch.object(
         api_service, "verify_password", return_value=True
@@ -595,6 +600,44 @@ def test_user_lookup_login_and_logout_cover_success_paths():
     assert err is None
     assert data["token"] == "token"
     assert data["user"]["id"] == 3
+
+
+def test_login_user_rehashes_legacy_password_hash_after_successful_login():
+    user = SimpleNamespace(
+        id=4,
+        username="legacy",
+        email="legacy@example.com",
+        password_hash="legacy-sha256",
+        avatar_url="",
+        created_at=None,
+    )
+    db = MagicMock()
+    db.scalar.return_value = user
+
+    with patch.object(api_service, "SessionLocal", _session_factory(db)), patch.object(
+        api_service, "verify_password", return_value=True
+    ), patch.object(api_service, "password_needs_rehash", return_value=True), patch.object(
+        api_service, "hash_password", return_value="bcrypt-hash"
+    ), patch.object(api_service, "create_access_token", return_value="token"):
+        data, err = api_service.login_user("legacy@example.com", "password")
+
+    assert err is None
+    assert data["token"] == "token"
+    assert user.password_hash == "bcrypt-hash"
+    db.commit.assert_called_once()
+    db.refresh.assert_called_once_with(user)
+
+
+def test_logout_user_requires_authenticated_current_user_and_valid_token():
+    data, err = api_service.logout_user(None, None)
+    assert data is None
+    assert err == (1002, "未登录或 Token 无效", 401)
+
+    with patch.object(api_service, "revoke_access_token", return_value=False):
+        data, err = api_service.logout_user({"id": 1}, "bad-token")
+
+    assert data is None
+    assert err == (1002, "未登录或 Token 无效", 401)
 
 
 def test_db_read_helpers_return_none_on_database_error():

@@ -52,8 +52,23 @@ def test_get_bearer_token_extracts_authorization_value():
 def test_password_hash_and_verify_password():
     hashed = auth.hash_password("secret")
 
+    assert hashed.startswith("$2")
     assert auth.verify_password("secret", hashed) is True
     assert auth.verify_password("wrong", hashed) is False
+
+
+def test_password_verify_accepts_legacy_sha256_hash():
+    legacy_hash = hashlib.sha256("secret".encode("utf-8")).hexdigest()
+
+    assert auth.verify_password("secret", legacy_hash) is True
+    assert auth.password_needs_rehash(legacy_hash) is True
+
+
+def test_revoked_token_can_no_longer_be_decoded():
+    token = auth.create_access_token(123)
+
+    assert auth.revoke_access_token(token) is True
+    assert auth.decode_access_token(token) is None
 
 
 def test_b64_decode_accepts_unpadded_data():

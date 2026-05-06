@@ -529,7 +529,10 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(login_response.status_code, 200)
         self.assertIn("token", login_response.json()["data"])
 
-        logout_response = self.client.post("/api/v1/auth/logout")
+        logout_response = self.client.post(
+            "/api/v1/auth/logout",
+            headers={"Authorization": f"Bearer {login_response.json()['data']['token']}"},
+        )
         self.assertEqual(logout_response.status_code, 200)
         self.assertTrue(logout_response.json()["data"]["success"])
 
@@ -578,13 +581,23 @@ class ApiTestCase(unittest.TestCase):
         )
         self.assertEqual(me_body["data"]["email"], f"contract-{self.case_id}@example.com")
 
-        logout_response = self.client.post("/api/v1/auth/logout")
+        logout_response = self.client.post(
+            "/api/v1/auth/logout",
+            headers={"Authorization": f"Bearer {token}"},
+        )
         self.assertEqual(logout_response.status_code, 200)
         logout_body = logout_response.json()
         self.assertEqual(logout_body["code"], 0)
         self.assertEqual(logout_body["msg"], "success")
         self.assertSetEqual(set(logout_body["data"].keys()), {"success"})
         self.assertTrue(logout_body["data"]["success"])
+
+        users_me_after_logout = self.client.get(
+            "/api/v1/users/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(users_me_after_logout.status_code, 401)
+        self.assertEqual(users_me_after_logout.json()["code"], 1002)
 
     def test_auth_contract_users_me_unauthorized(self):
         response = self.client.get("/api/v1/users/me")
