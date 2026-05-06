@@ -53,10 +53,10 @@ def _b64_decode(data: str) -> bytes:
 
 
 def _split_token(token: str) -> Optional[tuple[str, str, str]]:
-    try:
-        return tuple(token.split(".", 2))
-    except ValueError:
+    parts = token.split(".", 2)
+    if len(parts) != 3:
         return None
+    return parts[0], parts[1], parts[2]
 
 
 def _verify_signature(header_segment: str, payload_segment: str, signature_segment: str) -> bool:
