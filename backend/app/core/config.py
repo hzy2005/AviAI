@@ -3,12 +3,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "AviAI Backend"
-    secret_key: str = "aviai-dev-secret"
+    secret_key: str = "change-me-in-env-before-production-use"
     access_token_expire_minutes: int = 60 * 24 * 7
     use_mock_data: bool = True
-    database_url: str = (
-        "mysql+pymysql://root:123456@127.0.0.1:3306/aviai?charset=utf8mb4"
-    )
+    database_url: str = "sqlite:///./aviai.db"
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com/v1"
     deepseek_model: str = "deepseek-chat"
