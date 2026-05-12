@@ -9,7 +9,7 @@ cryptography>=43.0.0
 bcrypt>=4.2.0
 Pillow==12.2.0
 torch>=2.3.0
-torchvision>=0.18.0
+torchvision>=0.26.0
 pytest
 pytest-cov
 httpx
