@@ -1,7 +1,7 @@
 # 安全审查贡献说明
 
 姓名：QiuZhixiang  
-学号：待补充  
+学号：2312190432  
 日期：2026-05-12
 
 ## 我完成的工作
@@ -58,7 +58,7 @@
 
 ## PR 链接
 
-- PR #待补充：https://github.com/hzy2005/AviAI/pulls
+- PR #待补充：https://github.com/hzy2005/AviAI/pull/60
 
 ## 遇到的问题和解决
 
