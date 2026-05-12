@@ -107,6 +107,7 @@
   - `fastapi`：`0.115.5` -> `0.136.1`，带入更高版本的安全版 `starlette`。
   - `python-multipart`：`0.0.12` -> `0.0.27`。
   - `Pillow`：`10.4.0` -> `12.2.0`。
+  - `SQLAlchemy`：`2.0.36` -> `2.0.49`，修复 Python 3.14 环境下 ORM 类型解析兼容问题。
   - 运行 `npm audit fix` 修复前端 `brace-expansion` 中危漏洞。
 
 ## 安全检查清单
@@ -131,7 +132,7 @@
 ### 依赖安全
 
 - [x] 前端依赖扫描：运行 `npm audit --audit-level=high`，初次发现 1 个中危 `brace-expansion`，执行 `npm audit fix` 后复扫结果为 `found 0 vulnerabilities`。
-- [x] 后端依赖扫描：运行 `python -m pip_audit -r backend\requirements.txt`，发现 `python-multipart`、`Pillow`、`starlette` 已知漏洞；已升级对应依赖声明。复扫时本机访问 PyPI/OSV 多次超时或 SSL 中断，已记录为环境问题，建议在 GitHub Actions 或网络稳定环境中再次执行。
+- [x] 后端依赖扫描：初扫发现 `python-multipart`、`Pillow`、`starlette` 已知漏洞；升级依赖后，使用 OSV 漏洞库复扫，结果为 `No known vulnerabilities found`。
 
 ## CI 自动化安全扫描
 
@@ -153,14 +154,16 @@ npm audit --audit-level=high
 cd ..
 python -m pip install pip-audit
 python -m pip_audit -r backend\requirements.txt
-python -m pip_audit --timeout 60 -r backend\requirements.txt --no-deps --disable-pip
+python -m pip_audit --vulnerability-service osv --timeout 60 -r backend\requirements.txt --index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+python -m pytest
 ```
 
 关键结果：
 
 - `npm audit fix` 后：`found 0 vulnerabilities`
 - `pip-audit` 初扫：发现 11 个漏洞，分布在 `python-multipart`、`Pillow`、`starlette`
-- 后端依赖已升级到扫描建议的修复版本；本地复扫受 PyPI/OSV 网络超时影响，需在 CI 或稳定网络中复核
+- `pip-audit` 复扫：`No known vulnerabilities found`
+- 后端测试：`78 passed, 3 warnings`
 
 ## 学习通截图清单
 
@@ -172,4 +175,4 @@ python -m pip_audit --timeout 60 -r backend\requirements.txt --no-deps --disable
 
 ## 结论
 
-本次安全审查完成了“AI 辅助审查 + 至少两处漏洞修复 + 安全检查清单 + CI 自动化安全扫描”的核心要求。项目已完成密码存储升级、logout token 失效、敏感默认配置清理和依赖漏洞升级，并补充了自动化 gitleaks 扫描。剩余需要人工完成的是学习通要求的截图材料，以及在 GitHub Actions 或网络稳定环境中复核后端 `pip-audit` 扫描结果。
+本次安全审查完成了“AI 辅助审查 + 至少两处漏洞修复 + 安全检查清单 + CI 自动化安全扫描”的核心要求。项目已完成密码存储升级、logout token 失效、敏感默认配置清理和依赖漏洞升级，并补充了自动化 gitleaks 扫描。前端 `npm audit`、后端 `pip-audit` 和后端测试均已通过；剩余需要人工完成的是学习通要求的截图材料。

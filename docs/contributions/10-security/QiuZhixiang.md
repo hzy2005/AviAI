@@ -42,7 +42,7 @@
 - [x] XSS：微信小程序前端不使用 `innerHTML`
 - [x] API Key / 密码：通过环境变量读取，`.env.example` 仅保留占位值
 - [x] `.env` 文件：已加入 `.gitignore`，仓库中有 `backend/.env.example`
-- [x] 依赖扫描：前端 `npm audit` 已清零；后端 `pip-audit` 已发现并修复依赖声明，复扫受本地网络超时影响，需在 CI 或稳定网络中复核
+- [x] 依赖扫描：前端 `npm audit` 已清零；后端 `pip-audit` 初扫发现漏洞，升级依赖后复扫结果为 `No known vulnerabilities found`
 
 ### CI 安全扫描
 
@@ -68,8 +68,8 @@
 2. 问题：原密码哈希使用单次 `SHA-256`，安全性不足。  
    解决：升级到 `bcrypt`，并兼容旧哈希在登录时自动重哈希迁移。
 
-3. 问题：后端依赖扫描发现 `python-multipart`、`Pillow`、`starlette` 存在已知漏洞。  
-   解决：升级 `backend/requirements.txt` 中对应依赖版本；本地复扫受网络影响未完成，需要在 GitHub Actions 或稳定网络中复核。
+3. 问题：后端依赖扫描发现 `python-multipart`、`Pillow`、`starlette` 存在已知漏洞，升级后在 Python 3.14 下又暴露出 `SQLAlchemy==2.0.36` 的 ORM 类型解析兼容问题。  
+   解决：升级 `backend/requirements.txt` 中对应依赖版本，并将 `SQLAlchemy` 升级到 `2.0.49`；复跑 `pip-audit` 结果为 `No known vulnerabilities found`，后端测试 `78 passed`。
 
 4. 问题：前端 `npm audit` 初扫发现 `brace-expansion` 中危漏洞。  
    解决：执行 `npm audit fix`，复扫结果为 `found 0 vulnerabilities`。
