@@ -57,7 +57,7 @@
 
 ## PR 链接
 
-- PR #待补充：https://github.com/hzy2005/AviAI/pulls
+- PR #待补充：https://github.com/hzy2005/AviAI/pull/62
 
 ## 遇到的问题和解决
 
