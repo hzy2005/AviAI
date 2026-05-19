@@ -15,7 +15,8 @@ FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 
 USER root
 
-RUN rm -rf /usr/share/nginx/html/* \
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/share/nginx/html/* \
     && printf '%s\n' \
     '<!doctype html>' \
     '<html lang="en">' \
