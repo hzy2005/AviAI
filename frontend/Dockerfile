@@ -15,8 +15,8 @@ FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 
 USER root
 
-COPY --from=quality /app /usr/share/nginx/html
-RUN printf '%s\n' \
+RUN rm -rf /usr/share/nginx/html/* \
+    && printf '%s\n' \
     '<!doctype html>' \
     '<html lang="en">' \
     '<head><meta charset="utf-8"><title>AviAI Mini Program</title></head>' \

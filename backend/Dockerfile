@@ -11,7 +11,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements.docker.txt .
 RUN pip install --upgrade pip \
-    && pip install -r requirements.docker.txt
+    && pip install -r requirements.docker.txt \
+    && pip uninstall -y setuptools wheel
 
 FROM python:3.11-slim AS runtime
 
@@ -24,7 +25,17 @@ ENV PATH="/opt/venv/bin:$PATH" \
 COPY --from=builder /opt/venv /opt/venv
 COPY . .
 
-RUN useradd --create-home --shell /usr/sbin/nologin appuser \
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get purge -y --auto-remove \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /usr/local/lib/python3.11/site-packages/setuptools* \
+    && rm -rf /usr/local/lib/python3.11/site-packages/pkg_resources \
+    && rm -rf /usr/local/lib/python3.11/site-packages/wheel* \
+    && rm -rf /opt/venv/lib/python3.11/site-packages/setuptools* \
+    && rm -rf /opt/venv/lib/python3.11/site-packages/pkg_resources \
+    && rm -rf /opt/venv/lib/python3.11/site-packages/wheel* \
+    && useradd --create-home --shell /usr/sbin/nologin appuser \
     && mkdir -p /app/uploads \
     && chown -R appuser:appuser /app
 
