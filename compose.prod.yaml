@@ -1,0 +1,99 @@
+services:
+  frontend:
+    image: ghcr.io/${GITHUB_REPOSITORY:-local/aviai}/frontend:${VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "80:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  backend:
+    image: ghcr.io/${GITHUB_REPOSITORY:-local/aviai}/backend:${VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      ACCESS_TOKEN_EXPIRE_MINUTES: "10080"
+      USE_MOCK_DATA: "false"
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_VISION_MODEL: ${DEEPSEEK_VISION_MODEL:-deepseek-chat}
+    secrets:
+      - db_password
+      - backend_secret_key
+    volumes:
+      - backend_uploads:/app/uploads
+    command: >
+      sh -c "export DATABASE_URL=\"mysql+pymysql://aviai:$$(cat /run/secrets/db_password)@db:3306/aviai?charset=utf8mb4\" &&
+      export SECRET_KEY=\"$$(cat /run/secrets/backend_secret_key)\" &&
+      alembic upgrade head &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: aviai
+      MYSQL_USER: aviai
+      MYSQL_PASSWORD_FILE: /run/secrets/db_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+    secrets:
+      - db_password
+      - db_root_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "MYSQL_PWD=$$(cat /run/secrets/db_root_password) mysqladmin ping -h 127.0.0.1 -uroot --silent",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+volumes:
+  backend_uploads:
+  mysql_data:
+  redis_data:
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  db_root_password:
+    file: ./secrets/db_root_password.txt
+  backend_secret_key:
+    file: ./secrets/backend_secret_key.txt

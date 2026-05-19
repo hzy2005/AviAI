@@ -77,6 +77,11 @@ def health_check():
     )
 
 
+@app.get("/health", include_in_schema=False)
+def docker_health_check():
+    return health_check()
+
+
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(birds_router)
