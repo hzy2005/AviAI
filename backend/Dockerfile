@@ -9,9 +9,9 @@ ENV PIP_NO_CACHE_DIR=1 \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY requirements.txt .
+COPY requirements.docker.txt .
 RUN pip install --upgrade pip \
-    && pip install -r requirements.txt
+    && pip install -r requirements.docker.txt
 
 FROM python:3.11-slim AS runtime
 

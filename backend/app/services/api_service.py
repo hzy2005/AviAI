@@ -13,9 +13,6 @@ import threading
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from PIL import Image, UnidentifiedImageError
-import torch
-import torch.nn.functional as F
-from torchvision.models import ResNet18_Weights, resnet18
 
 from app.core.auth import (
     create_access_token,
@@ -215,6 +212,8 @@ def _load_bird_model():
         if _BIRD_MODEL is not None:
             return _BIRD_MODEL, _BIRD_PREPROCESS, _BIRD_LABELS
 
+        from torchvision.models import ResNet18_Weights, resnet18
+
         weights = ResNet18_Weights.DEFAULT
         model = resnet18(weights=weights)
         model.eval()
@@ -240,6 +239,9 @@ def _map_project_bird_name(raw_label: str) -> str:
 
 
 def _predict_bird_from_torch(file_path: Path) -> tuple[str, float]:
+    import torch
+    import torch.nn.functional as F
+
     model, preprocess, labels = _load_bird_model()
     with Image.open(file_path) as image:
         input_tensor = preprocess(image.convert("RGB")).unsqueeze(0)
