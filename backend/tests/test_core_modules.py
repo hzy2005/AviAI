@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import time
 
 import pytest
@@ -9,6 +10,7 @@ import pytest
 from app.core import auth
 from app.core.responses import error, success
 from app.schemas import AICopywritingRequest, CreatePostRequest, LoginRequest
+from app.utils.logger import JsonFormatter
 
 
 def test_access_token_round_trip_decodes_user_id():
@@ -97,6 +99,32 @@ def test_error_response_uses_unified_envelope():
         "message": "bad request",
         "data": {"field": "email"},
     }
+
+
+def test_json_formatter_outputs_structured_log_fields():
+    record = logging.LogRecord(
+        name="app.test",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="request completed",
+        args=(),
+        exc_info=None,
+    )
+    record.method = "GET"
+    record.path = "/health"
+    record.status_code = 200
+    record.duration_ms = 12.34
+
+    body = json.loads(JsonFormatter().format(record))
+
+    assert body["level"] == "INFO"
+    assert body["message"] == "request completed"
+    assert body["module"] == "test_core_modules"
+    assert body["method"] == "GET"
+    assert body["path"] == "/health"
+    assert body["status_code"] == 200
+    assert body["duration_ms"] == 12.34
 
 
 def test_login_request_requires_valid_lengths():
