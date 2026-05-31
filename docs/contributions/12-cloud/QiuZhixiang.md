@@ -17,8 +17,9 @@
 - [x] 配置文件编写：新增 `render.yaml`
 - [x] 后端容器适配：调整 `backend/Dockerfile`，支持 Render 动态端口 `PORT`
 - [x] 数据库迁移：容器启动时执行 `alembic upgrade head`
-- [ ] 环境变量配置：在 Render 控制台配置 `DATABASE_URL`、`SECRET_KEY`、`DEEPSEEK_API_KEY` 等变量
-- [ ] 自动部署配置：连接 GitHub 仓库并开启 Auto Deploy
+- [x] 环境变量配置：在 Render 控制台配置 `DATABASE_URL`、`SECRET_KEY`、`DEEPSEEK_API_KEY` 等变量
+- [x] 自动部署配置：连接 GitHub 仓库并开启 Auto Deploy
+- [x] 分支部署验证：使用 `feature/QiuZhixiang-cloud` 分支完成 Render 部署验证，后续 PR 合并到 `develop`
 - [x] 部署说明文档：新增 `docs/deployment.md`
 
 ### 3. 问题解决
@@ -38,19 +39,16 @@
 
 ## 在线地址
 
-部署完成后填写：
-
 ```text
-https://<render-service-domain>
+https://aviai-backend.onrender.com
 ```
 
 健康检查地址：
 
 ```text
-https://<render-service-domain>/api/v1/health
+https://aviai-backend.onrender.com/api/v1/health
 ```
 
 ## 心得体会
 
 这次部署让我把本地开发环境和线上运行环境之间的差异梳理得更清楚。后端云部署不仅要能构建镜像，还要处理端口、环境变量、数据库迁移和健康检查等生产环境问题。通过 Render 连接 GitHub 自动部署后，项目从提交代码到线上更新形成了完整流程，也更符合真实项目的交付方式。
-

@@ -43,8 +43,9 @@ uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
 2. 选择 New > Blueprint 或 New > Web Service。
 3. 连接 GitHub 仓库 `AviAI`。
 4. 选择部署分支：
-   - 若仓库默认分支为 `main`，选择 `main`。
-   - 若当前仓库仍使用 `master` 作为默认分支，选择 `master`。
+   - 作业验证阶段：选择个人云部署分支 `feature/QiuZhixiang-cloud`。
+   - 合并联调阶段：PR 合并到 `develop` 后，将 Render 服务的部署分支切换为 `develop`。
+   - 最终发布阶段：`develop` 合并到 `master` 后，可将生产服务的部署分支切换为 `master`，或保留 `develop` 作为开发环境服务。
 5. 使用仓库中的 `render.yaml` 创建服务。
 6. 在 Render 的 Environment 页面配置环境变量。
 7. 点击 Deploy，等待构建和启动完成。
@@ -106,9 +107,16 @@ https://<render-service-domain>
 
 Render 与 GitHub 仓库连接后，开启 Auto Deploy：
 
-- 推送到部署分支后自动构建 Docker 镜像。
+- 推送到当前绑定的部署分支后自动构建 Docker 镜像。
 - 构建成功后自动启动新版本服务。
 - 可在 Render Events 页面查看部署记录。
+
+当前分支流转建议：
+
+1. 在 `feature/QiuZhixiang-cloud` 分支完成部署验证，并提交作业截图。
+2. 创建 PR，将 `feature/QiuZhixiang-cloud` 合并到 `develop`。
+3. 合并后进入 Render 服务的 Settings 页面，将 Branch 从 `feature/QiuZhixiang-cloud` 改为 `develop`，然后执行一次 Manual Deploy。
+4. 当 `develop` 最终合并到 `master` 后，如果需要生产环境跟随 `master`，再将 Render Branch 改为 `master`。
 
 本项目也保留了 GitHub Actions 中的 CI 和 Docker 构建检查，用于在云部署前发现测试、Lint 和镜像构建问题。
 
