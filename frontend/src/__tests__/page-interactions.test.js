@@ -8,6 +8,7 @@ const {
   mockModule,
   clearModule
 } = require("./helpers/test-utils");
+const { baseUrl } = require("../../config/env");
 
 function immediateTimeout() {
   const original = global.setTimeout;
@@ -244,7 +245,7 @@ test("community page uploads local image before requesting AI copy", async () =>
     content: ""
   });
   assert.equal(page.data.draftContent, "AI generated copy");
-  assert.equal(page.data.draftImages[0], "http://192.168.1.100:8000/uploads/post_001.jpg");
+  assert.equal(page.data.draftImages[0], `${baseUrl}/uploads/post_001.jpg`);
   assert.equal(page.data.draftAiButtonText, "AI Polish");
   assert.equal(page.data.aiCopyLoading, false);
   assert.equal(wx.showToast.calls[0][0].icon, "success");
@@ -284,7 +285,7 @@ test("recognize page formats stored result on show", () => {
 
   assert.equal(page.data.result.birdName, "戴胜");
   assert.equal(page.data.result.confidenceText, "91%");
-  assert.equal(page.data.result.fullImageUrl, "http://192.168.1.100:8000/uploads/record_001.jpg");
+  assert.equal(page.data.result.fullImageUrl, `${baseUrl}/uploads/record_001.jpg`);
 });
 
 test("recognize page posts recognition result to community", async () => {
