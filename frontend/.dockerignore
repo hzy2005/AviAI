@@ -1,0 +1,14 @@
+.env
+.env.*
+
+node_modules/
+coverage/
+coverage-temp/
+.nyc_output/
+
+.git/
+.gitignore
+
+dist/
+build/
+*.log

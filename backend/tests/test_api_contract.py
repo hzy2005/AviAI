@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 from app.main import app
 from app.routes.deps import get_current_user
+from app.utils.metrics import metrics_collector
 
 
 def assert_response_envelope(body, code):
@@ -32,6 +33,57 @@ def test_health_returns_running_status(client):
     assert body["data"]["status"] == "running"
     assert body["data"]["database"] == "connected"
     fake_engine.connect.assert_called_once()
+
+
+def test_plain_health_returns_monitoring_shape(client):
+    db_context = MagicMock()
+    db_context.__enter__.return_value = MagicMock()
+    db_context.__exit__.return_value = False
+    fake_engine = MagicMock()
+    fake_engine.connect.return_value = db_context
+
+    with patch("app.main.engine", fake_engine):
+        response = client.get("/health")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "healthy"
+    assert body["version"] == "0.3.0"
+    assert body["database"] == "connected"
+    assert "timestamp" in body
+
+
+def test_metrics_returns_request_counters(client):
+    metrics_collector.reset()
+
+    health_response = client.get("/api/v1/health")
+    metrics_response = client.get("/api/v1/metrics")
+
+    assert health_response.status_code == 200
+    assert metrics_response.status_code == 200
+    body = metrics_response.json()
+    assert_response_envelope(body, 0)
+    assert body["data"]["requestCount"] >= 1
+    assert body["data"]["errorCount"] >= 0
+    assert "errorRate" in body["data"]
+    assert "averageResponseMs" in body["data"]
+    assert "statusCodes" in body["data"]
+
+
+def test_prometheus_metrics_returns_text_format(client):
+    metrics_collector.reset()
+
+    client.get("/api/v1/health")
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    body = response.text
+    assert "# TYPE aviai_requests_total counter" in body
+    assert "aviai_requests_total" in body
+    assert "aviai_errors_total" in body
+    assert "aviai_average_response_ms" in body
+    assert 'aviai_status_codes_total{status_code="200"}' in body
 
 
 def test_login_success_returns_token(client):

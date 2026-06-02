@@ -8,6 +8,7 @@ const {
   mockModule,
   clearModule
 } = require("./helpers/test-utils");
+const { baseUrl } = require("../../config/env");
 
 function useImmediateTimeout() {
   const original = global.setTimeout;
@@ -361,12 +362,12 @@ test("community page upload helpers handle remote, local and invalid upload resu
     }
   });
 
-  page.setData({ draftImages: ["http://192.168.1.100:8000/uploads/existing.jpg"] });
+  page.setData({ draftImages: [`${baseUrl}/uploads/existing.jpg`] });
   assert.equal(await page.ensureDraftImageUploaded(), "/uploads/existing.jpg");
 
   page.setData({ draftImages: ["wxfile://local.jpg"] });
   assert.equal(await page.ensureDraftImageUploaded(), "/uploads/local.jpg");
-  assert.equal(page.data.draftImages[0], "http://192.168.1.100:8000/uploads/local.jpg");
+  assert.equal(page.data.draftImages[0], `${baseUrl}/uploads/local.jpg`);
 
   page.setData({ editingImages: ["tmp/edit.jpg"] });
   assert.equal(await page.ensureEditingImageUploaded(), "/uploads/local.jpg");
