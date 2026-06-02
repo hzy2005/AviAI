@@ -3,11 +3,12 @@ info:
   title: AviAI API
   version: 0.3.0
   description: >
-    AviAI 后端接口文档（OpenAPI 3.0）。基础路径为 /api/v1，
-    统一响应结构为 code/message/data，鉴权方式为 Bearer Token（JWT）。
+    AviAI 后端接口文档（OpenAPI 3.0）。业务接口基础路径为 /api/v1，
+    根路径 /health 用于平台健康检查；统一响应结构为 code/message/data，
+    鉴权方式为 Bearer Token（JWT）。
 servers:
-  - url: http://127.0.0.1:8000/api/v1
-    description: 本地开发环境
+  - url: http://127.0.0.1:8000
+    description: 本地开发环境服务根地址
 tags:
   - name: Health
     description: 服务健康检查
@@ -23,9 +24,34 @@ paths:
   /health:
     get:
       tags: [Health]
-      summary: 健康检查
-      description: 检查服务进程状态及数据库连接状态。
-      operationId: getHealth
+      summary: 平台健康检查
+      description: 根路径健康检查，供 Render、Docker 或监控截图直接访问；该接口不使用统一响应包裹。
+      operationId: getPlainHealth
+      x-idempotent: true
+      responses:
+        "200":
+          description: 检查成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlainHealthResponse"
+              examples:
+                success:
+                  summary: 服务正常
+                  value:
+                    status: healthy
+                    timestamp: "2026-06-02T03:05:47.255318+00:00"
+                    version: "0.3.0"
+                    database: connected
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/health:
+    get:
+      tags: [Health]
+      summary: API 健康检查
+      description: 使用项目统一响应结构返回服务状态和数据库连接状态。
+      operationId: getApiHealth
       x-idempotent: true
       responses:
         "200":
@@ -39,16 +65,49 @@ paths:
                   summary: 服务正常
                   value:
                     code: 0
-                    message: ok
+                    msg: success
+                    message: success
                     data:
                       service: backend
                       status: running
                       database: connected
-                      time: "2026-03-25T09:30:00Z"
+                      time: "2026-06-02T03:05:47.255318+00:00"
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /auth/register:
+  /api/v1/metrics:
+    get:
+      tags: [Health]
+      summary: 基础指标
+      description: 返回当前进程内存中的请求计数、错误率、平均响应时间、活跃请求数和状态码统计。
+      operationId: getMetrics
+      x-idempotent: true
+      responses:
+        "200":
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetricsResponse"
+              examples:
+                success:
+                  summary: 指标统计
+                  value:
+                    code: 0
+                    msg: success
+                    message: success
+                    data:
+                      requestCount: 155
+                      errorCount: 0
+                      errorRate: 0.0
+                      averageResponseMs: 614.72
+                      activeRequests: 2
+                      statusCodes:
+                        "200": 155
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/auth/register:
     post:
       tags: [Auth]
       summary: 用户注册
@@ -89,7 +148,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /auth/login:
+  /api/v1/auth/login:
     post:
       tags: [Auth]
       summary: 用户登录
@@ -133,7 +192,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /auth/logout:
+  /api/v1/auth/logout:
     post:
       tags: [Auth]
       summary: 用户登出
@@ -155,7 +214,7 @@ paths:
                     data:
                       success: true
 
-  /users/me:
+  /api/v1/users/me:
     get:
       tags: [Users]
       summary: 获取当前用户
@@ -187,7 +246,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /birds/recognize:
+  /api/v1/birds/recognize:
     post:
       tags: [Birds]
       summary: 上传图片识别
@@ -234,7 +293,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /birds/records:
+  /api/v1/birds/records:
     get:
       tags: [Birds]
       summary: 查询识别记录
@@ -275,7 +334,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /posts:
+  /api/v1/posts:
     post:
       tags: [Posts]
       summary: 发布动态
@@ -359,7 +418,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /posts/{postId}:
+  /api/v1/posts/{postId}:
     get:
       tags: [Posts]
       summary: 获取动态详情
@@ -430,7 +489,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /posts/{postId}/like:
+  /api/v1/posts/{postId}/like:
     post:
       tags: [Posts]
       summary: 点赞动态
@@ -468,7 +527,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /posts/{postId}/comments:
+  /api/v1/posts/{postId}/comments:
     post:
       tags: [Posts]
       summary: 评论动态
@@ -651,6 +710,10 @@ components:
           type: string
           description: 响应提示信息。
           example: ok
+        msg:
+          type: string
+          description: 兼容字段，与 message 保持一致。
+          example: ok
         data:
           description: 业务数据，失败时通常为 null。
           nullable: true
@@ -667,6 +730,10 @@ components:
         message:
           type: string
           description: 错误描述。
+          example: 参数错误
+        msg:
+          type: string
+          description: 兼容字段，与 message 保持一致。
           example: 参数错误
         data:
           type: object
@@ -698,6 +765,29 @@ components:
           description: 服务当前时间（UTC）。
           example: "2026-03-25T09:30:00Z"
 
+    PlainHealthResponse:
+      type: object
+      description: 根路径 /health 返回的简洁健康检查结构，不使用统一响应包裹。
+      required: [status, timestamp, version, database]
+      properties:
+        status:
+          type: string
+          description: 服务健康状态。
+          example: healthy
+        timestamp:
+          type: string
+          format: date-time
+          description: 检查时间（UTC）。
+          example: "2026-06-02T03:05:47.255318+00:00"
+        version:
+          type: string
+          description: 应用版本。
+          example: "0.3.0"
+        database:
+          type: string
+          description: 数据库连接状态。
+          example: connected
+
     HealthResponse:
       type: object
       required: [code, message, data]
@@ -705,11 +795,71 @@ components:
         code:
           type: integer
           example: 0
+        msg:
+          type: string
+          example: success
         message:
           type: string
-          example: ok
+          example: success
         data:
           $ref: "#/components/schemas/HealthData"
+
+    MetricsData:
+      type: object
+      description: 当前进程内存中的基础监控指标。
+      required:
+        - requestCount
+        - errorCount
+        - errorRate
+        - averageResponseMs
+        - activeRequests
+        - statusCodes
+      properties:
+        requestCount:
+          type: integer
+          description: 已处理请求总数。
+          example: 155
+        errorCount:
+          type: integer
+          description: 5xx 错误请求数。
+          example: 0
+        errorRate:
+          type: number
+          format: float
+          description: 5xx 错误率。
+          example: 0.0
+        averageResponseMs:
+          type: number
+          format: float
+          description: 平均响应时间，单位毫秒。
+          example: 614.72
+        activeRequests:
+          type: integer
+          description: 当前活跃请求数。
+          example: 2
+        statusCodes:
+          type: object
+          description: 各 HTTP 状态码累计计数。
+          additionalProperties:
+            type: integer
+          example:
+            "200": 155
+
+    MetricsResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          example: 0
+        msg:
+          type: string
+          example: success
+        message:
+          type: string
+          example: success
+        data:
+          $ref: "#/components/schemas/MetricsData"
 
     RegisterRequest:
       type: object

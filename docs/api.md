@@ -5,7 +5,8 @@
 本项目 API 按 OpenAPI 3.0 维护，机器可读规范见 [api.yaml](./api.yaml)。  
 本文件用于前后端联调时快速确认“实际契约”，字段和状态码以 `api.yaml` 为准。
 
-- 基础路径：`/api/v1`
+- 业务接口基础路径：`/api/v1`
+- 平台健康检查：`/health`，位于服务根路径，不使用统一响应包裹
 - 数据格式：`application/json`
 - 鉴权方式：`Authorization: Bearer <token>`
 - 时间格式：ISO 8601（例如 `2026-03-09T10:30:00Z`）
@@ -47,7 +48,9 @@
 
 | 模块 | 方法 | 路径 | 鉴权 | 说明 |
 | --- | --- | --- | --- | --- |
-| Health | GET | `/health` | 否 | 服务健康检查 |
+| Health | GET | `/health` | 否 | 平台健康检查，根路径简洁结构 |
+| Health | GET | `/api/v1/health` | 否 | API 健康检查，统一响应结构 |
+| Health | GET | `/api/v1/metrics` | 否 | 基础监控指标，统一响应结构 |
 | Auth | POST | `/auth/register` | 否 | 用户注册 |
 | Auth | POST | `/auth/login` | 否 | 用户登录 |
 | Auth | POST | `/auth/logout` | 否 | 用户登出 |
@@ -62,6 +65,55 @@
 | Posts | DELETE | `/posts/{postId}` | 是 | 删除动态（仅作者） |
 | Posts | POST | `/posts/{postId}/like` | 是 | 点赞动态 |
 | Posts | POST | `/posts/{postId}/comments` | 是 | 评论动态 |
+
+### 3.1 Health / Metrics
+
+`GET /health` 用于 Render、Docker 和监控截图，返回简洁结构，不套 `code/message/data`：
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-06-02T03:05:47.255318+00:00",
+  "version": "0.3.0",
+  "database": "connected"
+}
+```
+
+`GET /api/v1/health` 用于业务侧或 API 文档验证，返回统一响应结构：
+
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "message": "success",
+  "data": {
+    "service": "backend",
+    "status": "running",
+    "database": "connected",
+    "time": "2026-06-02T03:05:47.255318+00:00"
+  }
+}
+```
+
+`GET /api/v1/metrics` 返回当前进程内存中的基础监控指标：
+
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "message": "success",
+  "data": {
+    "requestCount": 155,
+    "errorCount": 0,
+    "errorRate": 0.0,
+    "averageResponseMs": 614.72,
+    "activeRequests": 2,
+    "statusCodes": {
+      "200": 155
+    }
+  }
+}
+```
 
 ## 4. 前端关键契约
 
