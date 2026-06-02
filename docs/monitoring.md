@@ -7,6 +7,7 @@
 - 结构化 JSON 日志
 - 健康检查端点
 - 基础指标收集
+- Prometheus 指标导出（可选）
 - Sentry 错误追踪（可选）
 - UptimeRobot 可用性告警（可选）
 - Render 部署环境中的日志查看和截图验证
@@ -142,6 +143,41 @@ GET /api/v1/metrics
 }
 ```
 
+### 4.1 Prometheus 指标导出（可选）
+
+为了便于后续接入 Prometheus / Grafana，后端额外提供 Prometheus 文本格式指标：
+
+```text
+GET /metrics
+```
+
+该接口返回 `text/plain; version=0.0.4` 格式，示例：
+
+```text
+# HELP aviai_requests_total Total number of processed HTTP requests.
+# TYPE aviai_requests_total counter
+aviai_requests_total 12
+# HELP aviai_errors_total Total number of 5xx HTTP requests.
+# TYPE aviai_errors_total counter
+aviai_errors_total 0
+# HELP aviai_average_response_ms Average response time in milliseconds.
+# TYPE aviai_average_response_ms gauge
+aviai_average_response_ms 9.41
+aviai_status_codes_total{status_code="200"} 12
+```
+
+Prometheus 抓取配置示例：
+
+```yaml
+scrape_configs:
+  - job_name: "aviai-backend"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["aviai-backend.onrender.com"]
+```
+
+说明：当前指标仍来自进程内存统计，适合课程作业和单实例部署验证；如果后续扩展为多实例部署，建议接入独立指标存储。
+
 ## 5. Render 日志查看
 
 部署到 Render 后，可以在以下位置查看结构化日志：
@@ -234,7 +270,15 @@ Render Dashboard > aviai-backend > Logs
 https://aviai-backend.onrender.com/api/v1/metrics
 ```
 
-5. Sentry 配置截图（可选）：
+5. Prometheus 指标截图（可选）：
+
+```text
+https://aviai-backend.onrender.com/metrics
+```
+
+或 Grafana 面板截图。
+
+6. Sentry 配置截图（可选）：
 
 ```text
 Render Dashboard > aviai-backend > Environment > SENTRY_DSN
@@ -242,7 +286,7 @@ Render Dashboard > aviai-backend > Environment > SENTRY_DSN
 
 或 Sentry 控制台中项目 Issues 页面截图。
 
-6. UptimeRobot 告警截图（可选）：
+7. UptimeRobot 告警截图（可选）：
 
 ```text
 UptimeRobot Dashboard > AviAI Backend Health
@@ -254,5 +298,5 @@ UptimeRobot Dashboard > AviAI Backend Health
 
 当前实现为基础监控配置。后续可以继续扩展：
 
-- 接入 Prometheus / Grafana 进行长期指标存储和可视化
+- 接入 Grafana 面板进行长期指标可视化
 - 继续细化 Render 或第三方平台告警规则，覆盖错误率升高、响应时间变慢等场景

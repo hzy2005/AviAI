@@ -11,6 +11,7 @@ from app.core import auth
 from app.core.responses import error, success
 from app.schemas import AICopywritingRequest, CreatePostRequest, LoginRequest
 from app.utils.logger import JsonFormatter
+from app.utils.metrics import MetricsCollector
 from app.utils import sentry as sentry_utils
 
 
@@ -152,6 +153,20 @@ def test_configure_sentry_skips_without_dsn(monkeypatch):
     monkeypatch.setattr(sentry_utils.settings, "sentry_dsn", "")
 
     assert sentry_utils.configure_sentry() is False
+
+
+def test_metrics_collector_exports_prometheus_text():
+    collector = MetricsCollector()
+    collector.start_request()
+    collector.finish_request(200, 12.5)
+
+    body = collector.prometheus_text()
+
+    assert "# HELP aviai_requests_total" in body
+    assert "aviai_requests_total 1" in body
+    assert "aviai_errors_total 0" in body
+    assert "aviai_average_response_ms 12.5" in body
+    assert 'aviai_status_codes_total{status_code="200"} 1' in body
 
 
 def test_login_request_requires_valid_lengths():

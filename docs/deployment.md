@@ -151,7 +151,13 @@ Render Dashboard > aviai-backend > Environment
 UptimeRobot Dashboard > AviAI Backend Health
 ```
 
-5. 在线地址：
+5. Prometheus 指标截图（可选）：
+
+```text
+https://<render-service-domain>/metrics
+```
+
+6. 在线地址：
 
 ```text
 https://<render-service-domain>

@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -144,6 +144,14 @@ def docker_health_check():
 @app.get("/api/v1/metrics")
 def metrics():
     return success(metrics_collector.snapshot())
+
+
+@app.get("/metrics", include_in_schema=False)
+def prometheus_metrics():
+    return PlainTextResponse(
+        metrics_collector.prometheus_text(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 app.include_router(auth_router)

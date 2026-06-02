@@ -46,6 +46,34 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /metrics:
+    get:
+      tags: [Health]
+      summary: Prometheus 指标
+      description: 根路径 Prometheus text exposition 格式指标，便于 Prometheus / Grafana 抓取。
+      operationId: getPrometheusMetrics
+      x-idempotent: true
+      responses:
+        "200":
+          description: 获取成功
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                success:
+                  summary: Prometheus 指标
+                  value: |
+                    # HELP aviai_requests_total Total number of processed HTTP requests.
+                    # TYPE aviai_requests_total counter
+                    aviai_requests_total 155
+                    # HELP aviai_average_response_ms Average response time in milliseconds.
+                    # TYPE aviai_average_response_ms gauge
+                    aviai_average_response_ms 614.72
+                    aviai_status_codes_total{status_code="200"} 155
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/v1/health:
     get:
       tags: [Health]

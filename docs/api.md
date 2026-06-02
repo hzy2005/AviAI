@@ -49,6 +49,7 @@
 | 模块 | 方法 | 路径 | 鉴权 | 说明 |
 | --- | --- | --- | --- | --- |
 | Health | GET | `/health` | 否 | 平台健康检查，根路径简洁结构 |
+| Health | GET | `/metrics` | 否 | Prometheus 文本格式指标 |
 | Health | GET | `/api/v1/health` | 否 | API 健康检查，统一响应结构 |
 | Health | GET | `/api/v1/metrics` | 否 | 基础监控指标，统一响应结构 |
 | Auth | POST | `/auth/register` | 否 | 用户注册 |
@@ -113,6 +114,18 @@
     }
   }
 }
+```
+
+`GET /metrics` 返回 Prometheus text exposition 格式，便于 Prometheus / Grafana 抓取：
+
+```text
+# HELP aviai_requests_total Total number of processed HTTP requests.
+# TYPE aviai_requests_total counter
+aviai_requests_total 155
+# HELP aviai_average_response_ms Average response time in milliseconds.
+# TYPE aviai_average_response_ms gauge
+aviai_average_response_ms 614.72
+aviai_status_codes_total{status_code="200"} 155
 ```
 
 ## 4. 前端关键契约

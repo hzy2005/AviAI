@@ -56,6 +56,7 @@
 - [x] 补充 API 文档中 `/health` 与 `/api/v1/health` 的区别
 - [x] 补充 API 文档中 `/api/v1/metrics` 的返回结构
 - [x] 补充后端 README 中的监控入口
+- [x] 补充可选 Prometheus 文本格式指标接口
 - [x] 补充可选 Sentry 错误追踪配置
 - [x] 补充可选 UptimeRobot 服务可用性告警配置
 - [x] 整理学习通截图清单
@@ -78,11 +79,15 @@
 
    解决：在 `backend/README.md` 中补充 `GET /api/v1/metrics`，并在 API 文档中补充指标字段说明。
 
-4. 问题：错误追踪是作业选做项，但不能强制依赖真实 DSN，否则本地测试和普通部署会受影响。
+4. 问题：当前 `/api/v1/metrics` 是 JSON 结构，适合课程验收，但不方便 Prometheus / Grafana 直接抓取。
+
+   解决：新增根路径 `GET /metrics`，输出 Prometheus text exposition 格式，并在 `docs/monitoring.md` 中补充 Prometheus 抓取配置示例。
+
+5. 问题：错误追踪是作业选做项，但不能强制依赖真实 DSN，否则本地测试和普通部署会受影响。
 
    解决：新增可选 Sentry 配置，只有配置 `SENTRY_DSN` 时才初始化 Sentry；未配置时自动跳过，不影响服务启动。
 
-5. 问题：服务上线后还需要知道“什么时候不可用”，但项目本身没有独立告警系统。
+6. 问题：服务上线后还需要知道“什么时候不可用”，但项目本身没有独立告警系统。
 
    解决：在 `docs/monitoring.md` 中补充 UptimeRobot 外部 HTTP(s) 监控方案，监控 `https://aviai-backend.onrender.com/health`，并通过邮箱告警覆盖服务不可用场景。
 
@@ -132,6 +137,7 @@ git diff --check -- docs/api.md docs/api.yaml backend/README.md
 - 健康检查端点截图：浏览器访问 `https://aviai-backend.onrender.com/health`
 - 日志输出截图：Render Dashboard > `aviai-backend` > Logs 中的 JSON 请求日志
 - 指标接口截图：浏览器访问 `https://aviai-backend.onrender.com/api/v1/metrics`
+- Prometheus 指标截图（可选）：浏览器访问 `https://aviai-backend.onrender.com/metrics`
 - UptimeRobot 告警配置截图（可选）：Monitor Detail 页面显示 URL、状态 `Up` 和告警联系人
 
 ## 心得体会
