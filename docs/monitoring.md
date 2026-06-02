@@ -18,6 +18,7 @@ backend/app/utils/logger.py
 ```
 
 日志使用 JSON 格式输出到标准输出，便于在本地终端、Docker 日志和 Render Logs 中查看。
+同时，后端会接管 `uvicorn`、`uvicorn.error` 和 `uvicorn.access` logger，使 Uvicorn 访问日志也使用同一套 JSON 格式，避免 Render Logs 中混入默认文本日志。
 
 请求日志字段包括：
 

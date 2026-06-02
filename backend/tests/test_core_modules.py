@@ -127,6 +127,26 @@ def test_json_formatter_outputs_structured_log_fields():
     assert body["duration_ms"] == 12.34
 
 
+def test_json_formatter_structures_uvicorn_access_log_fields():
+    record = logging.LogRecord(
+        name="uvicorn.access",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg='%s - "%s %s HTTP/%s" %d',
+        args=("127.0.0.1:51234", "GET", "/health", "1.1", 200),
+        exc_info=None,
+    )
+
+    body = json.loads(JsonFormatter().format(record))
+
+    assert body["logger"] == "uvicorn.access"
+    assert body["client"] == "127.0.0.1:51234"
+    assert body["method"] == "GET"
+    assert body["path"] == "/health"
+    assert body["status_code"] == 200
+
+
 def test_login_request_requires_valid_lengths():
     assert LoginRequest(email="valid@example.com", password="12345678").email == "valid@example.com"
 
