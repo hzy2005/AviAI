@@ -11,6 +11,7 @@ from app.core import auth
 from app.core.responses import error, success
 from app.schemas import AICopywritingRequest, CreatePostRequest, LoginRequest
 from app.utils.logger import JsonFormatter
+from app.utils import sentry as sentry_utils
 
 
 def test_access_token_round_trip_decodes_user_id():
@@ -145,6 +146,12 @@ def test_json_formatter_structures_uvicorn_access_log_fields():
     assert body["method"] == "GET"
     assert body["path"] == "/health"
     assert body["status_code"] == 200
+
+
+def test_configure_sentry_skips_without_dsn(monkeypatch):
+    monkeypatch.setattr(sentry_utils.settings, "sentry_dsn", "")
+
+    assert sentry_utils.configure_sentry() is False
 
 
 def test_login_request_requires_valid_lengths():

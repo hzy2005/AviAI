@@ -17,10 +17,12 @@ from app.routes.posts import router as posts_router
 from app.routes.users import router as users_router
 from app.utils.logger import configure_logging, get_logger
 from app.utils.metrics import metrics_collector
+from app.utils.sentry import configure_sentry
 
 
 app = FastAPI(title="AviAI API", version="0.3.0")
 configure_logging()
+configure_sentry()
 logger = get_logger(__name__)
 APP_VERSION = "0.3.0"
 

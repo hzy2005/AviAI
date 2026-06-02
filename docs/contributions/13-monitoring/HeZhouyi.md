@@ -56,6 +56,7 @@
 - [x] 补充 API 文档中 `/health` 与 `/api/v1/health` 的区别
 - [x] 补充 API 文档中 `/api/v1/metrics` 的返回结构
 - [x] 补充后端 README 中的监控入口
+- [x] 补充可选 Sentry 错误追踪配置
 - [x] 整理学习通截图清单
 
 ## PR 链接
@@ -75,6 +76,10 @@
 3. 问题：指标收集是评分项，但原后端 README 没有列出指标接口。
 
    解决：在 `backend/README.md` 中补充 `GET /api/v1/metrics`，并在 API 文档中补充指标字段说明。
+
+4. 问题：错误追踪是作业选做项，但不能强制依赖真实 DSN，否则本地测试和普通部署会受影响。
+
+   解决：新增可选 Sentry 配置，只有配置 `SENTRY_DSN` 时才初始化 Sentry；未配置时自动跳过，不影响服务启动。
 
 ## 验证结果
 

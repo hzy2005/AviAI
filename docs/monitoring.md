@@ -7,6 +7,7 @@
 - 结构化 JSON 日志
 - 健康检查端点
 - 基础指标收集
+- Sentry 错误追踪（可选）
 - Render 部署环境中的日志查看和截图验证
 
 ## 2. 结构化日志
@@ -150,7 +151,27 @@ Render Dashboard > aviai-backend > Logs
 
 访问 `/health`、`/api/v1/health` 或其他接口后，Logs 中会输出 JSON 请求日志，可作为学习通“日志输出截图”。
 
-## 6. 验收截图
+## 6. Sentry 错误追踪（可选）
+
+后端支持可选接入 Sentry，用于捕获未处理异常并在 Sentry 控制台中追踪错误。
+
+相关配置文件：
+
+```text
+backend/app/utils/sentry.py
+```
+
+当 `SENTRY_DSN` 为空时，后端会跳过 Sentry 初始化，不影响本地开发、测试或普通部署；当在 Render 环境变量中配置 `SENTRY_DSN` 后，服务启动时会自动初始化 Sentry FastAPI 集成。
+
+Render 建议配置：
+
+| 变量名 | 示例 | 说明 |
+| --- | --- | --- |
+| `SENTRY_DSN` | `https://xxx@o000000.ingest.sentry.io/0000000` | Sentry 项目的 DSN，敏感值需打码 |
+| `SENTRY_ENVIRONMENT` | `production` | Sentry 环境名称 |
+| `SENTRY_TRACES_SAMPLE_RATE` | `0.0` | 性能追踪采样率，课程作业可保持 0，仅启用错误追踪 |
+
+## 7. 验收截图
 
 学习通提交建议准备以下截图：
 
@@ -178,10 +199,17 @@ Render Dashboard > aviai-backend > Logs
 https://aviai-backend.onrender.com/api/v1/metrics
 ```
 
-## 7. 后续扩展
+5. Sentry 配置截图（可选）：
+
+```text
+Render Dashboard > aviai-backend > Environment > SENTRY_DSN
+```
+
+或 Sentry 控制台中项目 Issues 页面截图。
+
+## 8. 后续扩展
 
 当前实现为基础监控配置。后续可以继续扩展：
 
 - 接入 Prometheus / Grafana 进行长期指标存储和可视化
-- 接入 Sentry 进行错误追踪
 - 配置 Render 或第三方平台告警，覆盖服务不可用和错误率升高场景

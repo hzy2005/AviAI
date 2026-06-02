@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     deepseek_vision_temperature: float = 0.7
     deepseek_vision_max_tokens: int = 280
     deepseek_timeout_seconds: int = 15
+    sentry_dsn: str = ""
+    sentry_environment: str = "development"
+    sentry_traces_sample_rate: float = 0.0
 
     model_config = SettingsConfigDict(
         env_file=".env",
