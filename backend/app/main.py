@@ -52,10 +52,12 @@ _STATUS_TO_ERROR = {
 
 def get_database_status():
     try:
+        if engine is None:
+            return "disconnected"
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return "connected"
-    except SQLAlchemyError:
+    except (AttributeError, SQLAlchemyError):
         return "disconnected"
 
 
