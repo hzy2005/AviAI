@@ -145,7 +145,13 @@ https://<render-service-domain>/api/v1/health
 Render Dashboard > aviai-backend > Environment
 ```
 
-4. 在线地址：
+4. 可用性告警截图（可选）：
+
+```text
+UptimeRobot Dashboard > AviAI Backend Health
+```
+
+5. 在线地址：
 
 ```text
 https://<render-service-domain>

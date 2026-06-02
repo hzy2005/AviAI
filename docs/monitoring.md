@@ -8,6 +8,7 @@
 - 健康检查端点
 - 基础指标收集
 - Sentry 错误追踪（可选）
+- UptimeRobot 可用性告警（可选）
 - Render 部署环境中的日志查看和截图验证
 
 ## 2. 结构化日志
@@ -171,7 +172,41 @@ Render 建议配置：
 | `SENTRY_ENVIRONMENT` | `production` | Sentry 环境名称 |
 | `SENTRY_TRACES_SAMPLE_RATE` | `0.0` | 性能追踪采样率，课程作业可保持 0，仅启用错误追踪 |
 
-## 7. 验收截图
+## 7. 可用性告警（可选）
+
+为了覆盖“服务不可用告警”场景，可以使用 Render 健康检查配合 UptimeRobot 外部监控。
+
+### 7.1 Render 健康检查
+
+Render 部署配置中已设置健康检查路径：
+
+```text
+/api/v1/health
+```
+
+Render 会根据该路径判断服务是否健康，可在 Render Dashboard 的服务状态、Events 或 Logs 页面查看部署和健康检查相关信息。
+
+### 7.2 UptimeRobot 告警配置
+
+推荐在 UptimeRobot 中新增 HTTP(s) Monitor：
+
+| 配置项 | 建议值 |
+| --- | --- |
+| Monitor Type | HTTP(s) |
+| Friendly Name | `AviAI Backend Health` |
+| URL | `https://aviai-backend.onrender.com/health` |
+| Monitoring Interval | `5 minutes` |
+| Alert Contact | 个人邮箱 |
+
+告警验证方式：
+
+- UptimeRobot 监控列表中显示服务状态为 `Up`
+- Monitor Detail 页面显示最近检查成功
+- Alert Contact 已绑定邮箱
+
+学习通提交时可将 UptimeRobot Monitor Detail 页面作为“服务不可用告警配置”截图；如果不提交该选做项，不影响基础监控要求。
+
+## 8. 验收截图
 
 学习通提交建议准备以下截图：
 
@@ -207,9 +242,17 @@ Render Dashboard > aviai-backend > Environment > SENTRY_DSN
 
 或 Sentry 控制台中项目 Issues 页面截图。
 
-## 8. 后续扩展
+6. UptimeRobot 告警截图（可选）：
+
+```text
+UptimeRobot Dashboard > AviAI Backend Health
+```
+
+截图中建议包含监控 URL、状态 `Up`、检查间隔和告警联系人。
+
+## 9. 后续扩展
 
 当前实现为基础监控配置。后续可以继续扩展：
 
 - 接入 Prometheus / Grafana 进行长期指标存储和可视化
-- 配置 Render 或第三方平台告警，覆盖服务不可用和错误率升高场景
+- 继续细化 Render 或第三方平台告警规则，覆盖错误率升高、响应时间变慢等场景
