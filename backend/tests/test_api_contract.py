@@ -70,6 +70,22 @@ def test_metrics_returns_request_counters(client):
     assert "statusCodes" in body["data"]
 
 
+def test_prometheus_metrics_returns_text_format(client):
+    metrics_collector.reset()
+
+    client.get("/api/v1/health")
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    body = response.text
+    assert "# TYPE aviai_requests_total counter" in body
+    assert "aviai_requests_total" in body
+    assert "aviai_errors_total" in body
+    assert "aviai_average_response_ms" in body
+    assert 'aviai_status_codes_total{status_code="200"}' in body
+
+
 def test_login_success_returns_token(client):
     login_data = {
         "token": "test-token",

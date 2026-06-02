@@ -4,6 +4,28 @@ import sys
 from datetime import datetime, timezone
 
 
+def _parse_uvicorn_access(record):
+    if record.name != "uvicorn.access" or not isinstance(record.args, tuple):
+        return {}
+
+    # Uvicorn access logs pass: client, method, path, http_version, status_code.
+    if len(record.args) < 5:
+        return {}
+
+    client, method, path, _http_version, status_code = record.args[:5]
+    try:
+        status_code = int(status_code)
+    except (TypeError, ValueError):
+        pass
+
+    return {
+        "client": client,
+        "method": method,
+        "path": path,
+        "status_code": status_code,
+    }
+
+
 class JsonFormatter(logging.Formatter):
     def format(self, record):
         payload = {
@@ -13,6 +35,8 @@ class JsonFormatter(logging.Formatter):
             "module": record.module,
             "logger": record.name,
         }
+
+        payload.update(_parse_uvicorn_access(record))
 
         for key in (
             "method",
@@ -53,6 +77,12 @@ def configure_logging(level=logging.INFO):
         handler = existing_handler
 
     handler.setFormatter(JsonFormatter())
+
+    for logger_name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        uvicorn_logger = logging.getLogger(logger_name)
+        uvicorn_logger.handlers = [handler]
+        uvicorn_logger.propagate = False
+        uvicorn_logger.setLevel(level)
 
 
 def get_logger(name):

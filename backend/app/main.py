@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -17,10 +17,12 @@ from app.routes.posts import router as posts_router
 from app.routes.users import router as users_router
 from app.utils.logger import configure_logging, get_logger
 from app.utils.metrics import metrics_collector
+from app.utils.sentry import configure_sentry
 
 
 app = FastAPI(title="AviAI API", version="0.3.0")
 configure_logging()
+configure_sentry()
 logger = get_logger(__name__)
 APP_VERSION = "0.3.0"
 
@@ -142,6 +144,14 @@ def docker_health_check():
 @app.get("/api/v1/metrics")
 def metrics():
     return success(metrics_collector.snapshot())
+
+
+@app.get("/metrics", include_in_schema=False)
+def prometheus_metrics():
+    return PlainTextResponse(
+        metrics_collector.prometheus_text(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 app.include_router(auth_router)

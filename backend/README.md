@@ -16,7 +16,10 @@ Backend runs at `http://localhost:8000`.
 
 ## API
 
-- Health: `GET /api/v1/health`
+- Platform health check: `GET /health`
+- API health check: `GET /api/v1/health`
+- JSON metrics: `GET /api/v1/metrics`
+- Prometheus metrics: `GET /metrics`
 - Current user (demo): `GET /api/v1/users/me`
 - Bird recognize (demo): `POST /api/v1/birds/recognize` with `multipart/form-data` field `image`
 

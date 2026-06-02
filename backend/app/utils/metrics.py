@@ -40,6 +40,33 @@ class MetricsCollector:
                 "statusCodes": dict(self.status_codes),
             }
 
+    def prometheus_text(self):
+        snapshot = self.snapshot()
+        lines = [
+            "# HELP aviai_requests_total Total number of processed HTTP requests.",
+            "# TYPE aviai_requests_total counter",
+            f"aviai_requests_total {snapshot['requestCount']}",
+            "# HELP aviai_errors_total Total number of 5xx HTTP requests.",
+            "# TYPE aviai_errors_total counter",
+            f"aviai_errors_total {snapshot['errorCount']}",
+            "# HELP aviai_error_rate Current 5xx error rate.",
+            "# TYPE aviai_error_rate gauge",
+            f"aviai_error_rate {snapshot['errorRate']}",
+            "# HELP aviai_average_response_ms Average response time in milliseconds.",
+            "# TYPE aviai_average_response_ms gauge",
+            f"aviai_average_response_ms {snapshot['averageResponseMs']}",
+            "# HELP aviai_active_requests Current active HTTP requests.",
+            "# TYPE aviai_active_requests gauge",
+            f"aviai_active_requests {snapshot['activeRequests']}",
+            "# HELP aviai_status_codes_total Total HTTP requests by status code.",
+            "# TYPE aviai_status_codes_total counter",
+        ]
+
+        for status_code, count in sorted(snapshot["statusCodes"].items()):
+            lines.append(f'aviai_status_codes_total{{status_code="{status_code}"}} {count}')
+
+        return "\n".join(lines) + "\n"
+
     def reset(self):
         with self._lock:
             self.request_count = 0

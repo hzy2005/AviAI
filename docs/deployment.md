@@ -83,10 +83,13 @@ Render 后端服务需要配置以下环境变量：
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com/v1` | DeepSeek API 地址 |
 | `DEEPSEEK_MODEL` | `deepseek-chat` | 文本模型 |
 | `DEEPSEEK_VISION_MODEL` | `deepseek-chat` | 图片相关模型配置 |
+| `SENTRY_DSN` | `https://xxx@o000000.ingest.sentry.io/0000000` | Sentry 错误追踪 DSN，可选 |
+| `SENTRY_ENVIRONMENT` | `production` | Sentry 环境名称，可选 |
+| `SENTRY_TRACES_SAMPLE_RATE` | `0.0` | Sentry 性能追踪采样率，可选 |
 
 注意：
 
-- 不要把真实数据库密码、`SECRET_KEY`、`DEEPSEEK_API_KEY` 写入仓库。
+- 不要把真实数据库密码、`SECRET_KEY`、`DEEPSEEK_API_KEY`、`SENTRY_DSN` 写入仓库。
 - 截图提交时可以打码变量值，但变量名需要清晰可见。
 
 ## 5. 前端接入线上后端
@@ -142,7 +145,19 @@ https://<render-service-domain>/api/v1/health
 Render Dashboard > aviai-backend > Environment
 ```
 
-4. 在线地址：
+4. 可用性告警截图（可选）：
+
+```text
+UptimeRobot Dashboard > AviAI Backend Health
+```
+
+5. Prometheus 指标截图（可选）：
+
+```text
+https://<render-service-domain>/metrics
+```
+
+6. 在线地址：
 
 ```text
 https://<render-service-domain>
