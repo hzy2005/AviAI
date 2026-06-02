@@ -124,7 +124,7 @@ alembic upgrade head
 
 ## PR 链接
 
-- PR #78: https://github.com/hzy2005/AviAI/pull/78
+- PR #78: https://github.com/hzy2005/AviAI/pull/81
 
 ## 在线地址
 

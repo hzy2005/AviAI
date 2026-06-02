@@ -94,7 +94,7 @@ https://aviai-backend.onrender.com/api/v1/auth/login
 
 ## PR 链接
 
-- PR #待补充：https://github.com/hzy2005/AviAI/pull/待补充
+- PR #待补充：https://github.com/hzy2005/AviAI/pull/81
 
 ## 在线地址
 
