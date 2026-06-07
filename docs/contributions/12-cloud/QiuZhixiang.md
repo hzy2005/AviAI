@@ -124,7 +124,7 @@ alembic upgrade head
 
 ## PR 链接
 
-- PR #78: https://github.com/hzy2005/AviAI/pull/81
+- PR #78: https://github.com/hzy2005/AviAI/pull/78
 
 ## 在线地址
 
@@ -137,16 +137,6 @@ https://aviai-backend.onrender.com
 ```text
 https://aviai-backend.onrender.com/api/v1/health
 ```
-
-## 截图证明
-
-学习通提交时准备以下截图：
-
-- Git 提交记录截图：`git log --author="QiuZhixiang" --oneline --graph`
-- Render 部署成功截图：`/api/v1/health` 返回 `database: connected`
-- Render 环境变量配置截图：敏感值打码，变量名保留
-- 微信开发者工具运行截图
-- Network 面板请求 Render 后端接口截图
 
 ## 心得体会
 
