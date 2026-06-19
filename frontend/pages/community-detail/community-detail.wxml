@@ -14,18 +14,18 @@
         <swiper-item wx:for="{{imageList}}" wx:key="*this">
           <image class="hero-image" src="{{item}}" mode="aspectFill" data-src="{{item}}" bindtap="onPreviewImage" />
           <view class="hero-mask"></view>
-          <view class="hero-name">{{detail.author.username || 'Bird Lover'}}</view>
+          <view class="hero-name">{{detail.postTitle || 'Bird Story'}}</view>
         </swiper-item>
       </swiper>
       <view wx:else class="hero-empty">
-        <view class="hero-name">{{detail.author.username || 'Bird Lover'}}</view>
+        <view class="hero-name">{{detail.postTitle || 'Bird Story'}}</view>
       </view>
     </view>
 
     <view class="talk-block">
       <text class="talk-title">Talk</text>
       <view class="talk-content-wrap">
-        <text class="talk-content {{isTalkExpanded ? 'expanded' : 'collapsed'}}">{{detail.content || 'No description yet.'}}</text>
+        <text class="talk-content {{isTalkExpanded ? 'expanded' : 'collapsed'}}">{{detail.postBody || 'No description yet.'}}</text>
         <text wx:if="{{showReadMore}}" class="read-more" bindtap="onToggleTalk">{{isTalkExpanded ? 'Collapse' : 'Read more'}}</text>
       </view>
 

@@ -32,6 +32,33 @@ function normalizeComment(raw = {}) {
   };
 }
 
+function parsePostContent(content) {
+  const text = String(content || "").trim();
+  if (!text) {
+    return {
+      title: "Bird Story",
+      body: ""
+    };
+  }
+
+  const lines = text.split(/\r?\n/);
+  const title = (lines[0] || "").trim() || "Bird Story";
+  const body = lines.slice(1).join("\n").trim() || text;
+
+  return { title, body };
+}
+
+function normalizePostDetail(raw = {}) {
+  const parsed = parsePostContent(raw.content);
+  return {
+    ...raw,
+    postTitle: parsed.title,
+    postBody: parsed.body,
+    createdAtText: formatDateTime(raw.createdAt),
+    fullImageUrl: toFullImageUrl(raw.imageUrl)
+  };
+}
+
 function buildCommentTree(list) {
   const sorted = [...list].sort((a, b) => {
     const ta = new Date(a.createdAt).getTime();
@@ -121,18 +148,14 @@ Page({
       return;
     }
 
-    const detail = {
-      ...cached,
-      createdAtText: formatDateTime(cached.createdAt),
-      fullImageUrl: toFullImageUrl(cached.imageUrl)
-    };
+    const detail = normalizePostDetail(cached);
     const imageList = detail.fullImageUrl ? [detail.fullImageUrl] : [];
 
     this.setData({
       detail,
       imageList,
       displayLikeCount: Number(detail.likeCount || 0),
-      showReadMore: String(detail.content || "").length > 120
+      showReadMore: String(detail.postBody || "").length > 120
     });
   },
 
@@ -161,11 +184,7 @@ Page({
     this.setData({ loading: true });
     try {
       const res = await posts.detail(this.data.postId);
-      const detail = {
-        ...res.data,
-        createdAtText: formatDateTime(res.data.createdAt),
-        fullImageUrl: toFullImageUrl(res.data.imageUrl)
-      };
+      const detail = normalizePostDetail(res.data);
 
       const images = Array.isArray(res.data.imageUrls)
         ? res.data.imageUrls.map((url) => toFullImageUrl(url)).filter(Boolean)
@@ -179,7 +198,7 @@ Page({
         detail,
         imageList,
         displayLikeCount: Number(detail.likeCount || 0),
-        showReadMore: String(detail.content || "").length > 120
+        showReadMore: String(detail.postBody || "").length > 120
       });
     } catch (error) {
       wx.showToast({ title: error.message || "Detail load failed", icon: "none" });
@@ -208,7 +227,7 @@ Page({
   onShareAppMessage() {
     const detail = this.data.detail || {};
     return {
-      title: detail.content || "AviAI Community Post",
+      title: detail.postTitle || detail.content || "AviAI Community Post",
       path: `/pages/community-detail/community-detail?postId=${this.data.postId}`,
       imageUrl: this.data.imageList[0] || ""
     };

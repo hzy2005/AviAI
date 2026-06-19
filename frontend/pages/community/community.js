@@ -23,10 +23,31 @@ function getCardSize(index) {
   return "medium";
 }
 
-function getDisplayTitle(content) {
+function parsePostContent(content) {
   const text = String(content || "").trim();
-  if (!text) return "Bird Story";
-  return text.length > 26 ? `${text.slice(0, 26)}...` : text;
+  if (!text) {
+    return {
+      title: "Bird Story",
+      body: ""
+    };
+  }
+
+  const lines = text.split(/\r?\n/);
+  const title = (lines[0] || "").trim() || "Bird Story";
+  const body = lines.slice(1).join("\n").trim() || text;
+
+  return { title, body };
+}
+
+function composePostContent(title, body) {
+  const normalizedTitle = String(title || "").trim();
+  const normalizedBody = String(body || "").trim();
+  return `${normalizedTitle}\n\n${normalizedBody}`.trim();
+}
+
+function getDisplayTitle(content) {
+  const { title } = parsePostContent(content);
+  return title.length > 26 ? `${title.slice(0, 26)}...` : title;
 }
 
 function getDraftAiButtonText(content) {
@@ -69,12 +90,14 @@ Page({
     showCreateModal: false,
     showManageModal: false,
     showMask: false,
+    draftTitle: "",
     draftContent: "",
     draftImages: [],
     draftAiButtonText: "AI Generate",
     aiCopyLoading: false,
     submitting: false,
     editingPostId: null,
+    editingTitle: "",
     editingContent: "",
     editingImages: [],
     currentUserId: null
@@ -177,6 +200,8 @@ Page({
         feedIndex: this.data.posts.length + index,
         createdAtText: formatDateTime(item.createdAt),
         fullImageUrl: toFullImageUrl(item.imageUrl),
+        postTitle: parsePostContent(item.content).title,
+        postBody: parsePostContent(item.content).body,
         displayTitle: getDisplayTitle(item.content),
         viewsText: `${Math.max(Number(item.likeCount) || 0, 1)} Views`
       }));
@@ -266,6 +291,7 @@ Page({
       showSearch: false,
       showMask: true,
       editingPostId: null,
+      editingTitle: "",
       editingContent: "",
       editingImages: []
     });
@@ -279,12 +305,17 @@ Page({
       showMask: false,
       aiCopyLoading: false,
       editingPostId: null,
+      editingTitle: "",
       editingContent: "",
       editingImages: []
     });
   },
 
   onStopBubble() {},
+
+  onDraftTitleInput(event) {
+    this.setData({ draftTitle: event.detail.value });
+  },
 
   onDraftInput(event) {
     const draftContent = event.detail.value;
@@ -394,11 +425,17 @@ Page({
   async onSubmitPost() {
     if (!requireAuth()) return;
 
-    const content = this.data.draftContent.trim();
-    if (!content) {
+    const title = this.data.draftTitle.trim();
+    const body = this.data.draftContent.trim();
+    if (!title) {
+      wx.showToast({ title: "Please enter title", icon: "none" });
+      return;
+    }
+    if (!body) {
       wx.showToast({ title: "Please enter content", icon: "none" });
       return;
     }
+    const content = composePostContent(title, body);
 
     try {
       this.setData({ submitting: true });
@@ -409,6 +446,7 @@ Page({
       });
       wx.showToast({ title: "Posted", icon: "success" });
       this.setData({
+        draftTitle: "",
         draftContent: "",
         draftImages: [],
         draftAiButtonText: "AI Generate",
@@ -428,12 +466,18 @@ Page({
     const postId = Number(event.currentTarget.dataset.id);
     const post = this.data.myPosts.find((item) => item.postId === postId);
     if (!post) return;
+    const parsed = parsePostContent(post.content);
 
     this.setData({
       editingPostId: postId,
-      editingContent: post.content || "",
+      editingTitle: parsed.title === "Bird Story" ? "" : parsed.title,
+      editingContent: parsed.body || "",
       editingImages: post.fullImageUrl ? [post.fullImageUrl] : []
     });
+  },
+
+  onEditTitleInput(event) {
+    this.setData({ editingTitle: event.detail.value });
   },
 
   onEditInput(event) {
@@ -443,6 +487,7 @@ Page({
   onEditCancel() {
     this.setData({
       editingPostId: null,
+      editingTitle: "",
       editingContent: "",
       editingImages: []
     });
@@ -474,12 +519,19 @@ Page({
 
   async onEditSave(event) {
     const postId = Number(event.currentTarget.dataset.id);
-    const content = this.data.editingContent.trim();
+    const title = this.data.editingTitle.trim();
+    const body = this.data.editingContent.trim();
 
-    if (!content) {
+    if (!title) {
+      wx.showToast({ title: "Title cannot be empty", icon: "none" });
+      return;
+    }
+
+    if (!body) {
       wx.showToast({ title: "Content cannot be empty", icon: "none" });
       return;
     }
+    const content = composePostContent(title, body);
 
     try {
       const imageUrl = await this.ensureEditingImageUploaded();
@@ -488,7 +540,7 @@ Page({
         imageUrl: imageUrl || null
       });
       wx.showToast({ title: "Updated", icon: "success" });
-      this.setData({ editingPostId: null, editingContent: "", editingImages: [] });
+      this.setData({ editingPostId: null, editingTitle: "", editingContent: "", editingImages: [] });
       await this.resetAndLoad();
     } catch (error) {
       wx.showToast({ title: error.message || "Update failed", icon: "none" });

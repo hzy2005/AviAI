@@ -61,10 +61,17 @@
 .hero-name {
   position: absolute;
   left: 48rpx;
+  right: 48rpx;
   bottom: 44rpx;
   font-size: 66rpx;
+  line-height: 1.08;
   color: #ffffff;
   font-weight: 700;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 
 .talk-block {
