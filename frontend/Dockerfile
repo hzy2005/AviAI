@@ -16,7 +16,7 @@ FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 USER root
 
 RUN apk update \
-    && apk add --no-cache --upgrade 'libxml2>=2.13.9-r1' \
+    && apk add --no-cache --upgrade 'libxml2>=2.13.9-r1' 'expat>=2.8.1-r0' \
     && apk upgrade --no-cache \
     && rm -rf /usr/share/nginx/html/* \
     && printf '%s\n' \
